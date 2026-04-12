@@ -404,7 +404,14 @@ def edit_settings() -> None:
     try:
         settings = _palworld_parse(PAL_SETTINGS_PATH)
     except (FileNotFoundError, ValueError):
-        _create_settings_from_default()
+        _create_settings_from_default(
+            DEFAULT_PAL_SETTINGS_PATH,
+            PAL_SETTINGS_PATH,
+            (
+                "[/Script/Pal.PalWorldSettings]",
+                "[/Script/Pal.PalGameWorldSettings]",
+            ),
+        )
         try:
             settings = _palworld_parse(PAL_SETTINGS_PATH)
         except (ValueError, FileNotFoundError) as e:

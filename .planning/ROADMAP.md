@@ -8,7 +8,7 @@
 ## Phases
 
 - [x] **Phase 1: Rename + Hygiene** — `git mv` package to `logpose/`, update `pyproject.toml`, scrub tracked `*.egg-info/`, add `from __future__ import annotations`, pin deps for Python 3.8 compat ✅ 2026-04-12
-- [ ] **Phase 2: Parameterize Helpers (no GAMES dict yet)** — thread game-specific paths/dicts through helpers, wrap Palworld regex parser/saver as named functions, land byte-diff regression harness
+- [x] **Phase 2: Parameterize Helpers (no GAMES dict yet)** — thread game-specific paths/dicts through helpers, wrap Palworld regex parser/saver as named functions, land byte-diff regression harness ✅ 2026-04-12
 - [ ] **Phase 3: Introduce GameSpec + GAMES dict (Palworld only)** — define `GameSpec` + `SettingsAdapter` dataclasses, fold all `PAL_*` module globals into `GAMES["palworld"]`, every helper takes `game: str`
 - [ ] **Phase 4: Typer Factory + Merged Polkit** — `_build_game_app(spec)` factory + `add_typer` loop, `no_args_is_help=True`, `typer.Exit`, `--version` callback, merged `40-logpose.rules` template, CLI smoke-test matrix
 - [ ] **Phase 5: Add ARK Entry + E2E** — `GAMES["ark"]`, `arkserver.service.template`, `_ark_parse`/`_ark_save` with correct `RawConfigParser` constructor, full ARK install flow (10 flags), per-game apt deps, sdk32+sdk64 fix, fresh-VM E2E
@@ -28,21 +28,22 @@
   4. `palserver.service.template` and polkit template are byte-identical to v0.1.19; running the existing Palworld install path still produces the same service file.
 **Plans**: TBD
 
-### Phase 2: Parameterize Helpers (no GAMES dict yet)
+### Phase 2: Parameterize Helpers (no GAMES dict yet) ✅ Complete (2026-04-12)
 **Goal**: Helper functions accept game-specific inputs as parameters (not module globals), and a byte-diff regression harness proves Palworld renders identically to v0.1.19 — the working oracle for every subsequent phase.
 **Depends on**: Phase 1
+**Status**: Passed static verification (3/3 static criteria). VM E2E (Criterion 4) deferred to Phase 5 per explicit ROADMAP wording and user direction. 19 atomic commits. Code review: clean. See `.planning/phases/02-parameterize-helpers-no-games-dict-yet/02-VERIFICATION.md`.
 **Requirements**: ARCH-04 (partial), PAL-03, PAL-04, PAL-09 (harness half), SET-01 prep, E2E-01 (also contributes to ARCH-05, ARCH-06, PAL-01, PAL-02, PAL-06)
 **Success Criteria** (what must be TRUE):
-  1. Palworld's `OptionSettings=(...)` regex parser is extracted into a named function `_palworld_parse(path) -> dict[str, str]`; the existing `should_quote` saver is extracted into `_palworld_save(path, values)`. Both are byte-equivalent to v0.1.19 on the fixture.
-  2. `_create_service_file`, `_fix_steam_sdk`, and the install/settings helpers accept explicit paths/dicts as arguments instead of reading module-level Palworld constants directly.
-  3. A byte-diff test script renders `palserver.service` against the fixed fixture (`user=foo`, `port=8211`, `players=32`) and asserts zero-diff against the v0.1.19 golden file; the script exits 0.
-  4. Palworld end-to-end behavior (install → start → edit-settings → stop) is unchanged when exercised manually — no observable regression from parameterization.
-**Plans**: 5 plans
-- [ ] 02-01-golden-fixture-and-harness-PLAN.md — Land the byte-diff regression harness with dual entrypoint, committed 323-byte golden fixture, and .gitattributes to preserve template EOF bytes
-- [ ] 02-02-extract-palworld-parse-save-PLAN.md — Rename _parse_settings → _palworld_parse(path) and _save_settings → _palworld_save(path, settings) with verbatim bodies
-- [ ] 02-03-parameterize-helpers-PLAN.md — Parameterize _run_steamcmd_update, _install_palworld, _fix_steam_sdk, _setup_polkit, _create_settings_from_default; split _create_service_file into _render_service_file + _write_service_file
-- [ ] 02-04-wire-typer-commands-PLAN.md — Wire install, update, edit_settings Typer commands to call parameterized helpers with Palworld values threaded from module-scope constants
-- [ ] 02-05-harness-real-render-path-PLAN.md — Extend harness with third test that imports _render_service_file and asserts byte-equality against golden (closes Pitfall 4)
+  1. Palworld's `OptionSettings=(...)` regex parser is extracted into a named function `_palworld_parse(path) -> dict[str, str]`; the existing `should_quote` saver is extracted into `_palworld_save(path, values)`. Both are byte-equivalent to v0.1.19 on the fixture. ✅
+  2. `_create_service_file`, `_fix_steam_sdk`, and the install/settings helpers accept explicit paths/dicts as arguments instead of reading module-level Palworld constants directly. ✅
+  3. A byte-diff test script renders `palserver.service` against the fixed fixture (`user=foo`, `port=8211`, `players=32`) and asserts zero-diff against the v0.1.19 golden file; the script exits 0. ✅ (3 tests in `tests/test_palworld_golden.py`)
+  4. Palworld end-to-end behavior (install → start → edit-settings → stop) is unchanged when exercised manually — no observable regression from parameterization. ⏭ Deferred to Phase 5 VM E2E.
+**Plans**: 5/5 complete
+- [x] 02-01-golden-fixture-and-harness-PLAN.md ✅
+- [x] 02-02-extract-palworld-parse-save-PLAN.md ✅
+- [x] 02-03-parameterize-helpers-PLAN.md ✅
+- [x] 02-04-wire-typer-commands-PLAN.md ✅
+- [x] 02-05-harness-real-render-path-PLAN.md ✅
 
 ### Phase 3: Introduce GameSpec + GAMES dict (Palworld only)
 **Goal**: The `GameSpec` + `SettingsAdapter` dataclasses and the `GAMES` registry become the single source of truth for per-game configuration; all Palworld module-globals are dissolved into `GAMES["palworld"]`.
@@ -123,8 +124,8 @@ Phases execute strictly in order — each phase's behavior contract depends on t
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Rename + Hygiene | 0/0 | Not started | — |
-| 2. Parameterize Helpers (no GAMES dict yet) | 0/5 | Planned | — |
+| 1. Rename + Hygiene | 0/0 | ✅ Complete | 2026-04-12 |
+| 2. Parameterize Helpers (no GAMES dict yet) | 5/5 | ✅ Complete | 2026-04-12 |
 | 3. Introduce GameSpec + GAMES dict (Palworld only) | 0/0 | Not started | — |
 | 4. Typer Factory + Merged Polkit | 0/0 | Not started | — |
 | 5. Add ARK Entry + E2E | 0/0 | Not started | — |

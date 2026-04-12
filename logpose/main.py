@@ -76,7 +76,7 @@ def _get_template(name: str) -> str:
         rich.print(
             f"Error: Template file not found at {template_path}", file=sys.stderr
         )
-        sys.exit(1)
+        raise typer.Exit(code=1)
 
 
 def _run_command(command: str, check: bool = True) -> None:
@@ -101,7 +101,7 @@ def _run_command(command: str, check: bool = True) -> None:
 
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         rich.print(f"\nError executing command: {e}", file=sys.stderr)
-        sys.exit(1)
+        raise typer.Exit(code=1)
 
 
 def _repair_package_manager() -> None:
@@ -283,7 +283,7 @@ def _create_settings_from_default(
             "Cannot create a new settings file. Please run `install` first or run the server once.",
             file=sys.stderr,
         )
-        sys.exit(1)
+        raise typer.Exit(code=1)
 
     console.print(
         "Configuration file is missing, empty, or corrupted. Creating a new one from default settings."
@@ -324,7 +324,7 @@ def _interactive_edit_loop(settings: dict[str, str]) -> None:
             break
         if choice.lower() == "quit":
             console.print("Exiting without saving.")
-            sys.exit(0)
+            raise typer.Exit()
 
         if choice not in settings:
             console.print(f"[bold red]Invalid setting '{choice}'.[/bold red]")

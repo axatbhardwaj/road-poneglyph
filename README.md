@@ -1,29 +1,31 @@
-# Palworld Server Launcher
+# logpose
 
-A simple command-line tool to help you install, manage, and run a dedicated Palworld server on Linux. This tool automates the setup process, including installing dependencies, configuring the server as a systemd service, and setting up permissions for easy management.
+A simple command-line tool to help you install, manage, and run a dedicated game server on Linux. `logpose` is a multi-game launcher; in v0.2.0 the Palworld sub-command is the supported target. It automates the setup process — installing dependencies, configuring the server as a systemd service, and setting up permissions for easy management.
 
 ## Features
 
 - **Automated Installation**: Installs SteamCMD and the Palworld dedicated server with a single command.
 - **Package Manager Repair**: Automatically attempts to fix common `apt` and `dpkg` issues before installation.
 - **Service Management**: Creates a `systemd` service to run the server in the background and start it on boot.
-- **Permission Handling**: Configures Polkit rules to allow server management (start, stop, restart) without needing `sudo`.
+- **Permission Handling**: Configures Polkit rules (single merged `40-logpose.rules` covering every registered game) to allow server management (start, stop, restart) without needing `sudo`.
 - **Unattended Setup**: Automatically accepts the SteamCMD license agreement for a smoother setup process.
 
 ## Prerequisites
 
-- An Ubuntu Linux distribution.
+- A Debian or Ubuntu Linux distribution.
 - `sudo` privileges for the user running the script.
 
 ## Installation
 
 ```bash
-pip install palworld-server-launcher
+pip install logpose-launcher
 ```
+
+The PyPI distribution is named `logpose-launcher`; the installed CLI binary is `logpose`.
 
 ## Usage
 
-After installation, you can use the `palworld-server-launcher` command:
+After installation, you can use the `logpose palworld <verb>` command set:
 
 ### Install the Server
 
@@ -31,10 +33,10 @@ This command will install the server, configure it with the specified port and p
 
 ```bash
 # Install the server with default settings (port 8211, 32 players)
-palworld-server-launcher install
+logpose palworld install
 
 # Install with custom settings and start the server immediately
-palworld-server-launcher install --port 8211 --players 16 --start
+logpose palworld install --port 8211 --players 16 --start
 ```
 
 ### Manage the Server
@@ -43,23 +45,32 @@ Once installed, you can control the server state. Thanks to the Polkit setup, yo
 
 ```bash
 # Start the server
-palworld-server-launcher start
+logpose palworld start
 
 # Stop the server
-palworld-server-launcher stop
+logpose palworld stop
 
 # Restart the server
-palworld-server-launcher restart
+logpose palworld restart
 
 # Check the server's status
-palworld-server-launcher status
+logpose palworld status
 
 # Enable the server to start automatically on boot
-palworld-server-launcher enable
+logpose palworld enable
 
 # Disable the server from starting on boot
-palworld-server-launcher disable
+logpose palworld disable
 
-### Update the Server
-palworld-server-launcher update
+# Update the server
+logpose palworld update
+
+# Edit the PalWorldSettings.ini file interactively
+logpose palworld edit-settings
+```
+
+### Version
+
+```bash
+logpose --version
 ```

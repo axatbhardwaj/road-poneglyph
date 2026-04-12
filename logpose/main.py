@@ -367,6 +367,134 @@ GAMES: dict[str, GameSpec] = {
 }
 
 
+def _build_game_app(spec: GameSpec) -> typer.Typer:
+    """Build a Typer sub-app that owns all nine verbs for a single GameSpec.
+
+    Factory pattern (04-RESEARCH Pitfall 1): `spec` is captured as a CLOSURE
+    variable; every inner @sub.command body references `spec.*` — never
+    `GAMES["palworld"]`, never hardcoded service names. This is what makes
+    the sub-apps safe to produce inside an `add_typer` loop over GAMES.
+    """
+    sub = typer.Typer(
+        help=f"Manage {spec.display_name} dedicated server.",
+        no_args_is_help=True,
+    )
+    port_default = int(spec.install_options.get("port_default", 0))
+    players_default = int(spec.install_options.get("players_default", 0))
+
+    @sub.command()
+    def install(
+        port: int = typer.Option(port_default, help="Port to run the server on."),
+        players: int = typer.Option(players_default, help="Maximum number of players."),
+        start: bool = typer.Option(
+            False, "--start", help="Start the server immediately after installation."
+        ),
+    ) -> None:
+        """Install the dedicated server and create a systemd service."""
+        if Path.home() == Path("/root"):
+            rich.print("This script should not be run as root. Exiting.", file=sys.stderr)
+            raise typer.Exit(code=1)
+
+        _install_steamcmd()
+        _run_steamcmd_update(spec.server_dir, spec.app_id)
+        for hook in spec.post_install_hooks:
+            hook()
+        service_content = _render_service_file(
+            service_name=spec.service_name,
+            template_name=spec.service_template_name,
+            user=Path.home().name,
+            working_directory=spec.server_dir,
+            exec_start_path=spec.server_dir / spec.binary_rel_path,
+            port=port,
+            players=players,
+        )
+        _write_service_file(
+            Path(f"/etc/systemd/system/{spec.service_name}.service"), service_content
+        )
+        _setup_polkit("40-palserver.rules", "palserver.rules.template", Path.home().name)
+
+        console.print("Installation complete!")
+
+        if start:
+            console.print("Starting the server...")
+            _run_command(f"systemctl start {spec.service_name}")
+            console.print("Server started successfully!")
+        else:
+            console.print(
+                f"You can now start the server with: logpose {spec.key} start"
+            )
+
+        console.print(
+            f"To enable the server to start on boot, run: logpose {spec.key} enable"
+        )
+
+    @sub.command()
+    def start() -> None:
+        """Start the dedicated server."""
+        _run_command(f"systemctl start {spec.service_name}")
+
+    @sub.command()
+    def stop() -> None:
+        """Stop the dedicated server."""
+        _run_command(f"systemctl stop {spec.service_name}")
+
+    @sub.command()
+    def restart() -> None:
+        """Restart the dedicated server."""
+        _run_command(f"systemctl restart {spec.service_name}")
+
+    @sub.command()
+    def status() -> None:
+        """Check the status of the dedicated server."""
+        _run_command(f"systemctl status {spec.service_name}", check=False)
+
+    @sub.command()
+    def enable() -> None:
+        """Enable the dedicated server to start on boot."""
+        _run_command(f"systemctl enable {spec.service_name}")
+
+    @sub.command()
+    def disable() -> None:
+        """Disable the dedicated server from starting on boot."""
+        _run_command(f"systemctl disable {spec.service_name}")
+
+    @sub.command()
+    def update() -> None:
+        """Update the dedicated server via steamcmd."""
+        console.print(f"Updating {spec.display_name} dedicated server...")
+        _run_steamcmd_update(spec.server_dir, spec.app_id)
+        console.print("Update complete! Restart the server for the changes to take effect.")
+
+    @sub.command(name="edit-settings")
+    def edit_settings() -> None:
+        """Edit the game's settings file interactively."""
+        try:
+            settings = spec.settings_adapter.parse(spec.settings_path)
+        except (FileNotFoundError, ValueError):
+            _create_settings_from_default(
+                spec.default_settings_path,
+                spec.settings_path,
+                spec.settings_section_rename,
+            )
+            try:
+                settings = spec.settings_adapter.parse(spec.settings_path)
+            except (ValueError, FileNotFoundError) as e:
+                rich.print(
+                    f"An error occurred after creating default settings: {e}",
+                    file=sys.stderr,
+                )
+                raise typer.Exit(code=1)
+
+        try:
+            _interactive_edit_loop(settings)
+            spec.settings_adapter.save(spec.settings_path, settings)
+        except Exception as e:
+            rich.print(f"An error occurred during settings edit: {e}", file=sys.stderr)
+            raise typer.Exit(code=1)
+
+    return sub
+
+
 @app.command()
 def install(
     port: int = typer.Option(8211, help="Port to run the server on."),
@@ -492,6 +620,14 @@ def edit_settings() -> None:
     except Exception as e:
         rich.print(f"An error occurred during settings edit: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+for _key, _spec in GAMES.items():
+    app.add_typer(
+        _build_game_app(_spec),
+        name=_key,
+        help=f"Manage {_spec.display_name}.",
+    )
 
 
 if __name__ == "__main__":

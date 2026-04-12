@@ -1,0 +1,2 @@
+logpose/templates/*.template -text
+tests/golden/** -text

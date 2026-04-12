@@ -202,9 +202,10 @@ def _palworld_parse(path: Path) -> dict[str, str]:
     return {key: value.strip('"') for key, value in settings_pairs}
 
 
-def _save_settings(settings: dict[str, str]) -> None:
-    """Saves the settings back to PalWorldSettings.ini."""
-    content = PAL_SETTINGS_PATH.read_text()
+def _palworld_save(path: Path, settings: dict[str, str]) -> None:
+    """Saves settings back to a Palworld PalWorldSettings.ini file."""
+    # verbatim from v0.1.19 _save_settings — PAL-04 invariant
+    content = path.read_text()
 
     def should_quote(value: str) -> bool:
         if value.lower() in ("true", "false", "none"):
@@ -223,7 +224,7 @@ def _save_settings(settings: dict[str, str]) -> None:
     new_content = re.sub(
         r"OptionSettings=\(.*?\)", f"OptionSettings=({settings_str})", content
     )
-    PAL_SETTINGS_PATH.write_text(new_content)
+    path.write_text(new_content)
     console.print("Settings saved successfully.")
 
 

@@ -70,7 +70,11 @@
   3. `40-logpose.rules` is generated from `40-logpose.rules.template` using a JS `units = [...]; indexOf(...)` pattern driven by `GAMES.values()`; `pkcheck --action-id=org.freedesktop.systemd1.manage-units --process $$ --detail unit palserver.service` returns an allowed result for the installing user.
   4. Interactive `logpose palworld edit-settings` uses the shared Rich-table + prompt-by-name editor dispatched through `SettingsAdapter`; UX is unchanged from v0.1.19.
   5. All error exits go through `raise typer.Exit(code=1)`; no `sys.exit(1)` remains in `logpose/main.py`.
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 04-01-PLAN.md — Add _build_game_app factory + register palworld sub-app alongside flat commands
+- [ ] 04-02-PLAN.md — Flip dispatch (delete flat commands, add --version callback, game-first only)
+- [ ] 04-03-PLAN.md — Merge polkit to 40-logpose.rules driven by GAMES.values() + golden test
+- [ ] 04-04-PLAN.md — Finish sys.exit → typer.Exit conversion + Palworld README CLI examples
 **UI hint**: yes
 
 ### Phase 5: Add ARK Entry + E2E (arkmanager wrapper)
@@ -144,7 +148,7 @@ Phases execute strictly in order — each phase's behavior contract depends on t
 | 1. Rename + Hygiene | 0/0 | ✅ Complete | 2026-04-12 |
 | 2. Parameterize Helpers (no GAMES dict yet) | 5/5 | ✅ Complete | 2026-04-12 |
 | 3. Introduce GameSpec + GAMES dict (Palworld only) | 0/0 | Not started | — |
-| 4. Typer Factory + Merged Polkit | 0/0 | Not started | — |
+| 4. Typer Factory + Merged Polkit | 0/4 | Not started | — |
 | 5. Add ARK Entry + E2E | 0/0 | Not started | — |
 | 6. Release Polish + PyPI | 0/0 | Not started | — |
 

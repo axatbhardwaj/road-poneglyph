@@ -156,22 +156,33 @@ def _fix_steam_sdk(steam_sdk_dst: Path, steam_client_so: Path) -> None:
         )
 
 
-def _create_service_file(port: int, players: int) -> None:
-    """Create a systemd service for the Pal Server."""
-    console.print("Creating Pal Server service...")
-    user = Path.home().name
-    service_file = Path("/etc/systemd/system/palserver.service")
-    template = _get_template("palserver.service.template")
-    pal_server_dir = STEAM_DIR / "steamapps/common/PalServer"
-    exec_start_path = pal_server_dir / "PalServer.sh"
-    service_content = template.format(
+def _render_service_file(
+    service_name: str,
+    template_name: str,
+    user: str,
+    working_directory: Path,
+    exec_start_path: Path,
+    port: int,
+    players: int,
+) -> str:
+    """Render a systemd unit file from a template. Pure: no I/O side effects."""
+    # `service_name` is accepted for signature symmetry with Phase 3 (caller derives
+    # the install path from it); the service template itself does not reference it.
+    _ = service_name  # silence "unused parameter" linters; kept for Phase 3 shape
+    template = _get_template(template_name)
+    return template.format(
         user=user,
         port=port,
         players=players,
         exec_start_path=exec_start_path,
-        working_directory=pal_server_dir,
+        working_directory=working_directory,
     )
-    _run_command(f"echo '{service_content}' | sudo tee {service_file}")
+
+
+def _write_service_file(service_file: Path, content: str) -> None:
+    """Write rendered service content to disk via sudo tee and reload systemd."""
+    console.print("Creating Pal Server service...")
+    _run_command(f"echo '{content}' | sudo tee {service_file}")
     _run_command("sudo systemctl daemon-reload")
 
 

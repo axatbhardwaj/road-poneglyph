@@ -15,7 +15,10 @@ import rich
 import typer
 from rich.console import Console
 
-app = typer.Typer()
+app = typer.Typer(
+    help="logpose — multi-game dedicated server launcher.",
+    no_args_is_help=True,
+)
 console = Console()
 STEAM_DIR = Path.home() / ".steam/steam"
 
@@ -495,131 +498,29 @@ def _build_game_app(spec: GameSpec) -> typer.Typer:
     return sub
 
 
-@app.command()
-def install(
-    port: int = typer.Option(8211, help="Port to run the server on."),
-    players: int = typer.Option(32, help="Maximum number of players."),
-    start: bool = typer.Option(
-        False, "--start", help="Start the server immediately after installation."
+def _version_cb(value: bool) -> None:
+    if value:
+        import importlib.metadata
+
+        try:
+            v = importlib.metadata.version("logpose-launcher")
+        except importlib.metadata.PackageNotFoundError:
+            v = "unknown"
+        typer.echo(f"logpose {v}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _root(
+    version: bool = typer.Option(
+        None,
+        "--version",
+        callback=_version_cb,
+        is_eager=True,
+        help="Show version and exit.",
     ),
 ) -> None:
-    """Install the Palworld dedicated server and create a systemd service."""
-    if Path.home() == Path("/root"):
-        rich.print("This script should not be run as root. Exiting.", file=sys.stderr)
-        sys.exit(1)
-
-    spec = GAMES["palworld"]
-
-    _install_steamcmd()
-    _run_steamcmd_update(spec.server_dir, spec.app_id)
-    for hook in spec.post_install_hooks:
-        hook()
-    service_content = _render_service_file(
-        service_name=spec.service_name,
-        template_name=spec.service_template_name,
-        user=Path.home().name,
-        working_directory=spec.server_dir,
-        exec_start_path=spec.server_dir / spec.binary_rel_path,
-        port=port,
-        players=players,
-    )
-    _write_service_file(Path(f"/etc/systemd/system/{spec.service_name}.service"), service_content)
-    _setup_polkit("40-palserver.rules", "palserver.rules.template", Path.home().name)
-
-    console.print("Installation complete!")
-
-    if start:
-        console.print("Starting the server...")
-        _run_command(f"systemctl start {spec.service_name}")
-        console.print("Server started successfully!")
-    else:
-        console.print(
-            "You can now start the server with: palworld-server-launcher start"
-        )
-
-    console.print(
-        "To enable the server to start on boot, run: palworld-server-launcher enable"
-    )
-
-
-@app.command()
-def start() -> None:
-    """Start the Palworld server."""
-    spec = GAMES["palworld"]
-    _run_command(f"systemctl start {spec.service_name}")
-
-
-@app.command()
-def stop() -> None:
-    """Stop the Palworld server."""
-    spec = GAMES["palworld"]
-    _run_command(f"systemctl stop {spec.service_name}")
-
-
-@app.command()
-def restart() -> None:
-    """Restart the Palworld server."""
-    spec = GAMES["palworld"]
-    _run_command(f"systemctl restart {spec.service_name}")
-
-
-@app.command()
-def status() -> None:
-    """Check the status of the Palworld server."""
-    spec = GAMES["palworld"]
-    _run_command(f"systemctl status {spec.service_name}", check=False)
-
-
-@app.command()
-def enable() -> None:
-    """Enable the Palworld server to start on boot."""
-    spec = GAMES["palworld"]
-    _run_command(f"systemctl enable {spec.service_name}")
-
-
-@app.command()
-def disable() -> None:
-    """Disable the Palworld server from starting on boot."""
-    spec = GAMES["palworld"]
-    _run_command(f"systemctl disable {spec.service_name}")
-
-
-@app.command()
-def update() -> None:
-    """Update the Palworld dedicated server."""
-    spec = GAMES["palworld"]
-    console.print("Updating Palworld dedicated server...")
-    _run_steamcmd_update(spec.server_dir, spec.app_id)
-    console.print("Update complete! Restart the server for the changes to take effect.")
-
-
-@app.command(name="edit-settings")
-def edit_settings() -> None:
-    """Edit the PalWorldSettings.ini file."""
-    spec = GAMES["palworld"]
-    try:
-        settings = spec.settings_adapter.parse(spec.settings_path)
-    except (FileNotFoundError, ValueError):
-        _create_settings_from_default(
-            spec.default_settings_path,
-            spec.settings_path,
-            spec.settings_section_rename,
-        )
-        try:
-            settings = spec.settings_adapter.parse(spec.settings_path)
-        except (ValueError, FileNotFoundError) as e:
-            rich.print(
-                f"An error occurred after creating default settings: {e}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-    try:
-        _interactive_edit_loop(settings)
-        spec.settings_adapter.save(spec.settings_path, settings)
-    except Exception as e:
-        rich.print(f"An error occurred during settings edit: {e}", file=sys.stderr)
-        sys.exit(1)
+    """logpose — multi-game dedicated server launcher."""
 
 
 for _key, _spec in GAMES.items():

@@ -7,7 +7,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Rename + Hygiene** — `git mv` package to `logpose/`, update `pyproject.toml`, scrub tracked `*.egg-info/`, add `from __future__ import annotations`, pin deps for Python 3.8 compat
+- [x] **Phase 1: Rename + Hygiene** — `git mv` package to `logpose/`, update `pyproject.toml`, scrub tracked `*.egg-info/`, add `from __future__ import annotations`, pin deps for Python 3.8 compat ✅ 2026-04-12
 - [ ] **Phase 2: Parameterize Helpers (no GAMES dict yet)** — thread game-specific paths/dicts through helpers, wrap Palworld regex parser/saver as named functions, land byte-diff regression harness
 - [ ] **Phase 3: Introduce GameSpec + GAMES dict (Palworld only)** — define `GameSpec` + `SettingsAdapter` dataclasses, fold all `PAL_*` module globals into `GAMES["palworld"]`, every helper takes `game: str`
 - [ ] **Phase 4: Typer Factory + Merged Polkit** — `_build_game_app(spec)` factory + `add_typer` loop, `no_args_is_help=True`, `typer.Exit`, `--version` callback, merged `40-logpose.rules` template, CLI smoke-test matrix
@@ -16,9 +16,10 @@
 
 ## Phase Details
 
-### Phase 1: Rename + Hygiene
+### Phase 1: Rename + Hygiene ✅ Complete (2026-04-12)
 **Goal**: Repo carries the `logpose` identity cleanly — package path, distribution name, pinned deps, and tree hygiene all align before any behavioral change.
 **Depends on**: Nothing (first phase)
+**Status**: Passed — 4 atomic commits (7257387, 10add52, 643e1c6, a6c2b3c). See `.planning/phases/01-rename-hygiene/01-SUMMARY.md`.
 **Requirements**: PKG-01, PKG-02, PKG-03, PKG-04, PKG-05, PKG-06 (also contributes to ARCH-05, ARCH-06, PAL-01, PAL-02, PAL-06)
 **Success Criteria** (what must be TRUE):
   1. Package directory is `logpose/` (history-preserved via `git mv`); `pyproject.toml` declares `name = "logpose-launcher"` with entry point `logpose = "logpose.main:app"` and pinned `typer>=0.9,<0.21`, `rich>=13.0,<14`.

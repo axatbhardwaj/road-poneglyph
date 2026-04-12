@@ -9,25 +9,25 @@
 **Core Value:** One CLI, many games, zero sudo prompts — operators type `logpose <game> <command>` and get a working, autostart-capable dedicated server on a fresh Debian/Ubuntu box.
 **Distribution name on PyPI:** `logpose-launcher` (CLI + import name stay `logpose`).
 **Granularity:** coarse (6 phases)
-**Current Focus:** Phase 1 — Rename + Hygiene
+**Current Focus:** Phase 2 — Parameterize Helpers (Phase 1 complete)
 
 ## Current Position
 
-**Phase:** 1 — Rename + Hygiene
-**Plan:** None yet (phase not yet planned)
-**Status:** Not started
-**Progress:** `[░░░░░░░░░░░░░░░░░░░░] 0% (0/6 phases complete)`
+**Phase:** 2 — Parameterize Helpers (no GAMES dict yet)
+**Plan:** TBD
+**Status:** Ready to plan
+**Progress:** `[███░░░░░░░░░░░░░░░░░] 17% (1/6 phases complete)`
 
-**Next action:** `/gsd-plan-phase 1` (or `/gsd-autonomous` to pick up from here and drive the milestone).
+**Next action:** `/gsd-plan-phase 2` (or `/gsd-autonomous` to resume).
 
 ## Performance Metrics
 
 | Metric | Value |
 |--------|-------|
-| Phases planned | 0 / 6 |
-| Phases complete | 0 / 6 |
-| Plans complete | 0 |
-| Requirements shipped | 0 / 56 |
+| Phases planned | 1 / 6 |
+| Phases complete | 1 / 6 |
+| Plans complete | 1 |
+| Requirements shipped | 6 / 56 (PKG-01..PKG-06) |
 | Byte-diff harness green | — (lands in Phase 2) |
 
 ## Quick Tasks Completed
@@ -40,7 +40,7 @@
 
 | Phase | Name | Status | Completed | Notes |
 |-------|------|--------|-----------|-------|
-| 1 | Rename + Hygiene | Pending | — | Mechanical; no research needed. Prerequisite for all later phases. |
+| 1 | Rename + Hygiene | ✅ Complete | 2026-04-12 | 4 atomic commits (7257387, 10add52, 643e1c6, a6c2b3c). Palworld behavior byte-identical per invariant check. |
 | 2 | Parameterize Helpers (no GAMES dict yet) | Pending | — | Lands byte-diff regression harness; Palworld stays working oracle. |
 | 3 | Introduce GameSpec + GAMES dict (Palworld only) | Pending | — | Dissolves `PAL_*` module globals into `GAMES["palworld"]`. |
 | 4 | Typer Factory + Merged Polkit | Pending | — | Game-first CLI + merged `40-logpose.rules`. Low-priority research flag. |

@@ -6,8 +6,9 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 import re
 
 import rich
@@ -20,6 +21,35 @@ STEAM_DIR = Path.home() / ".steam/steam"
 PAL_SERVER_DIR = STEAM_DIR / "steamapps/common/PalServer"
 PAL_SETTINGS_PATH = PAL_SERVER_DIR / "Pal/Saved/Config/LinuxServer/PalWorldSettings.ini"
 DEFAULT_PAL_SETTINGS_PATH = PAL_SERVER_DIR / "DefaultPalWorldSettings.ini"
+
+
+@dataclass(frozen=True)
+class SettingsAdapter:
+    """Per-game settings file I/O. Two callables, no state."""
+
+    parse: Callable[[Path], dict[str, str]]
+    save: Callable[[Path, dict[str, str]], None]
+
+
+@dataclass(frozen=True)
+class GameSpec:
+    """Frozen per-game configuration. Populated once at module scope in GAMES."""
+
+    key: str
+    display_name: str
+    app_id: int
+    server_dir: Path
+    binary_rel_path: str
+    settings_path: Path
+    default_settings_path: Optional[Path]
+    settings_section_rename: Optional[tuple[str, str]]
+    service_name: str  # bare name, no ".service" suffix
+    service_template_name: str
+    settings_adapter: "SettingsAdapter"
+    post_install_hooks: list[Callable[[], None]] = field(default_factory=list)
+    apt_packages: list[str] = field(default_factory=list)
+    steam_sdk_paths: list[tuple[Path, Path]] = field(default_factory=list)
+    install_options: dict[str, object] = field(default_factory=dict)
 
 
 def _get_os_id() -> str:
@@ -305,6 +335,45 @@ def _interactive_edit_loop(settings: dict[str, str]) -> None:
         )
         new_value = typer.prompt("Enter new value")
         settings[choice] = new_value
+
+
+# --- Palworld post-install hook + GAMES registry (Phase 3 Plan 01) ---
+# Module-private helpers bound once at import time. These are NOT the same as
+# the existing PAL_SERVER_DIR / PAL_SETTINGS_PATH / DEFAULT_PAL_SETTINGS_PATH
+# module globals (those dissolve in Plan 03-02). The underscore prefix signals
+# "internal to GAMES construction" — nothing outside this block reads them.
+_PAL_SERVER_DIR_LOCAL = STEAM_DIR / "steamapps/common/PalServer"
+_PAL_STEAM_CLIENT_SO = STEAM_DIR / "steamapps/common/Steamworks SDK Redist/linux64/steamclient.so"
+_PAL_SDK64_DST = Path.home() / ".steam/sdk64"
+
+
+def _palworld_sdk_hook() -> None:
+    """Palworld post-install hook: copy steamclient.so into sdk64 (PAL-08)."""
+    _fix_steam_sdk(_PAL_SDK64_DST, _PAL_STEAM_CLIENT_SO)
+
+
+GAMES: dict[str, GameSpec] = {
+    "palworld": GameSpec(
+        key="palworld",
+        display_name="Palworld",
+        app_id=2394010,
+        server_dir=_PAL_SERVER_DIR_LOCAL,
+        binary_rel_path="PalServer.sh",
+        settings_path=_PAL_SERVER_DIR_LOCAL / "Pal/Saved/Config/LinuxServer/PalWorldSettings.ini",
+        default_settings_path=_PAL_SERVER_DIR_LOCAL / "DefaultPalWorldSettings.ini",
+        settings_section_rename=(
+            "[/Script/Pal.PalWorldSettings]",
+            "[/Script/Pal.PalGameWorldSettings]",
+        ),
+        service_name="palserver",
+        service_template_name="palserver.service.template",
+        settings_adapter=SettingsAdapter(parse=_palworld_parse, save=_palworld_save),
+        post_install_hooks=[_palworld_sdk_hook],
+        apt_packages=[],
+        steam_sdk_paths=[(_PAL_STEAM_CLIENT_SO, _PAL_SDK64_DST)],
+        install_options={"port_default": 8211, "players_default": 32},
+    ),
+}
 
 
 @app.command()

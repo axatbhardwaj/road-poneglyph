@@ -55,7 +55,10 @@
   3. Every game-aware helper takes a required `game: str` (or `spec: GameSpec`) positional argument and reads Palworld values from `GAMES["palworld"]` — grepping for hardcoded `palserver`/`PalWorld`/`2394010` in helper bodies returns nothing.
   4. Palworld's section-rename (`[/Script/Pal.PalWorldSettings]` → `[/Script/Pal.PalGameWorldSettings]`) is expressed via `GameSpec.settings_section_rename`; `_fix_steam_sdk` is wired as a Palworld-only `post_install_hook`.
   5. Byte-diff harness from Phase 2 still exits 0 against the v0.1.19 golden file.
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 03-01-add-dataclasses-and-games-registry-PLAN.md — Add SettingsAdapter + GameSpec dataclasses + GAMES["palworld"] registry alongside existing globals (no call-site changes)
+- [ ] 03-02-dissolve-pal-globals-switch-call-sites-PLAN.md — Dissolve PAL_* module globals, rewire all @app.command() bodies to read GAMES["palworld"], delete _install_palworld wrapper (closes ARCH-04 + PAL-05)
+- [ ] 03-03-wire-fix-steam-sdk-post-install-hook-PLAN.md — Replace direct _fix_steam_sdk call with spec.post_install_hooks iteration (closes PAL-08)
 
 ### Phase 4: Typer Factory + Merged Polkit
 **Goal**: The CLI dispatches game-first (`logpose palworld <verb>`) via a factory-built sub-app loop, and a single merged polkit rule file authorizes every known game service unit.

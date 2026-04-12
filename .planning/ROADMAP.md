@@ -37,7 +37,12 @@
   2. `_create_service_file`, `_fix_steam_sdk`, and the install/settings helpers accept explicit paths/dicts as arguments instead of reading module-level Palworld constants directly.
   3. A byte-diff test script renders `palserver.service` against the fixed fixture (`user=foo`, `port=8211`, `players=32`) and asserts zero-diff against the v0.1.19 golden file; the script exits 0.
   4. Palworld end-to-end behavior (install → start → edit-settings → stop) is unchanged when exercised manually — no observable regression from parameterization.
-**Plans**: TBD
+**Plans**: 5 plans
+- [ ] 02-01-golden-fixture-and-harness-PLAN.md — Land the byte-diff regression harness with dual entrypoint, committed 323-byte golden fixture, and .gitattributes to preserve template EOF bytes
+- [ ] 02-02-extract-palworld-parse-save-PLAN.md — Rename _parse_settings → _palworld_parse(path) and _save_settings → _palworld_save(path, settings) with verbatim bodies
+- [ ] 02-03-parameterize-helpers-PLAN.md — Parameterize _run_steamcmd_update, _install_palworld, _fix_steam_sdk, _setup_polkit, _create_settings_from_default; split _create_service_file into _render_service_file + _write_service_file
+- [ ] 02-04-wire-typer-commands-PLAN.md — Wire install, update, edit_settings Typer commands to call parameterized helpers with Palworld values threaded from module-scope constants
+- [ ] 02-05-harness-real-render-path-PLAN.md — Extend harness with third test that imports _render_service_file and asserts byte-equality against golden (closes Pitfall 4)
 
 ### Phase 3: Introduce GameSpec + GAMES dict (Palworld only)
 **Goal**: The `GameSpec` + `SettingsAdapter` dataclasses and the `GAMES` registry become the single source of truth for per-game configuration; all Palworld module-globals are dissolved into `GAMES["palworld"]`.
@@ -119,7 +124,7 @@ Phases execute strictly in order — each phase's behavior contract depends on t
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Rename + Hygiene | 0/0 | Not started | — |
-| 2. Parameterize Helpers (no GAMES dict yet) | 0/0 | Not started | — |
+| 2. Parameterize Helpers (no GAMES dict yet) | 0/5 | Planned | — |
 | 3. Introduce GameSpec + GAMES dict (Palworld only) | 0/0 | Not started | — |
 | 4. Typer Factory + Merged Polkit | 0/0 | Not started | — |
 | 5. Add ARK Entry + E2E | 0/0 | Not started | — |

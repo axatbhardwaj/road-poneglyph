@@ -49,21 +49,29 @@ Requirements for initial `logpose-launcher` release on PyPI.
 - [ ] **PAL-08**: `_fix_steam_sdk()` preserved as Palworld-only post-install hook (Palworld only needs `sdk64`)
 - [ ] **PAL-09**: Byte-diff regression test — service file rendered with fixed fixture (`user=foo,port=8211,players=32`) must be byte-identical between v0.1.19 and v0.2.0 (zero-diff exit criterion)
 
-### ARK Support
+### ARK Support (arkmanager wrapper — pivoted 2026-04-12)
 
-- [ ] **ARK-01**: `GAMES["ark"]` entry with `app_id=376030`, `server_dir="~/.steam/steam/steamapps/common/ARK"`, `binary_rel_path="ShooterGame/Binaries/Linux/ShooterGameServer"`, `settings_path="ShooterGame/Saved/Config/LinuxServer/GameUserSettings.ini"`, `service_name="arkserver"`, `display_name="ARK: Survival Evolved"`
-- [ ] **ARK-02**: `arkserver.service.template` created with `LimitNOFILE=100000`, `KillSignal=SIGINT`, `TimeoutStopSec=300`, `Type=exec`, direct-binary `ExecStart` (no shell wrapper), `Restart=always`, `RestartSec=180`
-- [ ] **ARK-03**: ARK launch args format: `<Map>?listen?Port={game_port}?QueryPort={query_port}?RCONEnabled=True?RCONPort={rcon_port}?MaxPlayers={players} -server -log {battleye_flag}`
-- [ ] **ARK-04**: ARK SessionName written to `[SessionSettings]` in `GameUserSettings.ini`, NEVER to launch args (avoids shell-space bugs; 63-char soft warning)
-- [ ] **ARK-05**: ARK install flags: `--map` (default `TheIsland`, validated against 12-map enum), `--port` (default 7777), `--query-port` (default 27015), `--rcon-port` (default 27020), `--players` (default 70), `--session-name` (default `logpose-ark`), `--admin-password` (required, prompted hidden if missing; falls back to `secrets.token_urlsafe(16)` only with explicit flag; printed once), `--password` (optional ServerPassword), `--no-battleye` (flag, default BattlEye enabled), `--start`
-- [ ] **ARK-06**: Map enum validation at CLI boundary — rejects invalid maps with list of valid options (TheIsland, TheCenter, ScorchedEarth, Ragnarok, Aberration, Extinction, Valguero, CrystalIsles, Fjordur, LostIsland, Genesis, Gen2)
+**Pivot note:** v0.2.0 delegates ARK install/management to the third-party `arkmanager` (ark-server-tools) Bash harness. logpose wraps arkmanager; it does NOT re-implement steamcmd orchestration, direct systemd units, or `GameUserSettings.ini` editing for ARK. Reference: `docs/ark-install-reference.md`.
+
+- [ ] **ARK-01**: `GAMES["ark"]` entry with `app_id=376030`, `server_dir="/home/steam/ARK"`, `binary_rel_path="ShooterGame/Binaries/Linux/ShooterGameServer"`, `settings_path="/etc/arkmanager/instances/main.cfg"` (arkmanager owns GameUserSettings.ini directly; logpose edits main.cfg), `service_name="arkserver"` (opt-in systemd wrapper), `display_name="ARK: Survival Evolved"`, `install_backend="arkmanager"`, `branch="preaquatica"` (required for current Linux builds with mod support)
+- [ ] **ARK-02**: `arkserver.service.template` is a THIN wrapper around arkmanager: `Type=forking`, `RemainAfterExit=yes`, `ExecStart=/usr/bin/sudo -u steam /usr/local/bin/arkmanager start`, `ExecStop=/usr/bin/sudo -u steam /usr/local/bin/arkmanager stop`, `User=root` (needs root to sudo to steam). Disabled by default; enabled via `logpose ark install --enable-autostart`.
+- [ ] **ARK-03**: Launch args are arkmanager-controlled (via `main.cfg` ark_* keys). logpose does NOT render a launch-args string directly. ARK-03 satisfied when main.cfg round-trip with sample values produces a valid `arkmanager status` after install.
+- [ ] **ARK-04**: ARK SessionName is written to `main.cfg` as `ark_SessionName="..."` (arkmanager already handles the quoting/escaping correctly, even for names with spaces like `bunty's game`). The 63-char soft warning still applies at the CLI boundary.
+- [ ] **ARK-05**: ARK install flags: `--map` (default `TheIsland`, validated against the 12-map enum), `--port` (default 7778 — arkmanager's raw socket; game port 7777 is implicit), `--query-port` (default 27015), `--rcon-port` (default 27020), `--players` (default 10 per the reference install; can be overridden up to 70), `--session-name` (default `logpose-ark`), `--admin-password` (required, prompted hidden if missing; falls back to `secrets.token_urlsafe(16)` only with explicit `--generate-password` flag; printed once), `--password` (optional ark_ServerPassword), `--beta` (default `preaquatica`; set to empty string for stable branch), `--enable-autostart` (optional; enables arkserver.service at boot), `--start`
+- [ ] **ARK-06**: Map enum validation at CLI boundary — rejects invalid maps with list of valid options (TheIsland, TheCenter, ScorchedEarth_P, Aberration_P, Extinction, Ragnarok, Valguero_P, CrystalIsles, LostIsland, Fjordur, Genesis, Genesis2) — matches arkmanager's supported set
 - [ ] **ARK-07**: Port collision probe via `ss -tuln` before install; fail early with specific port number if conflict detected
-- [ ] **ARK-08**: `_ark_parse` uses `RawConfigParser(strict=False, interpolation=None, allow_no_value=True, delimiters=("=",), comment_prefixes=(";", "#"))` with `cp.optionxform = str` to preserve CamelCase keys; returns flat `{"Section.Key": value}` dict
-- [ ] **ARK-09**: `_ark_save` reads existing INI first (preserving untouched keys), mutates, writes back with `space_around_delimiters=False`
-- [ ] **ARK-10**: Install-time seed of `GameUserSettings.ini` with all install-flag values written to `[ServerSettings]` + `[SessionSettings]` — so `logpose ark edit-settings` works pre-first-launch
-- [ ] **ARK-11**: ARK apt deps installed via `_install_game_dependencies(game)` only when installing ARK: `lib32gcc-s1 libc6-i386 libncurses5 libncursesw5 libsdl2-2.0-0 lib32stdc++6` with `lib32gcc1` fallback when `lib32gcc-s1` unavailable (via `apt-cache show`)
-- [ ] **ARK-12**: `_fix_steam_sdk(game)` generalized — ARK copies `steamclient.so` to both `~/.steam/sdk32/` AND `~/.steam/sdk64/` plus symlink into `Engine/Binaries/ThirdParty/SteamCMD/Linux`; Palworld only sdk64 (unchanged behavior)
-- [ ] **ARK-13**: RCON triad alignment — install writes `RCONEnabled=True`, `RCONPort=<rcon_port>`, `ServerAdminPassword=<admin_password>` to INI AND includes `?RCONEnabled=True?RCONPort=<rcon_port>` in launch args
+- [ ] **ARK-08**: Settings parser/saver targets `/etc/arkmanager/instances/main.cfg` (bash-style `key="value"` format), NOT `GameUserSettings.ini`. Implementation reads line-by-line, preserves comments/whitespace, mutates the `ark_*` lines in place. Not a `RawConfigParser` — main.cfg is sourced shell syntax, so a regex-based line editor is the correct tool.
+- [ ] **ARK-09**: Editor writes main.cfg back with original line order and unrelated keys untouched (in-place edit, not full rewrite)
+- [ ] **ARK-10**: Install-time seed of `/etc/arkmanager/instances/main.cfg` with all install-flag values (`arkserverroot`, `serverMap`, `ark_SessionName`, `ark_Port`, `ark_QueryPort`, `ark_RCONEnabled`, `ark_RCONPort`, `ark_ServerPassword`, `ark_ServerAdminPassword`, `ark_MaxPlayers`). GameUserSettings.ini is NOT touched by logpose — arkmanager owns it.
+- [ ] **ARK-11**: ARK apt deps (minimum set verified on Debian 13 per install record): `steamcmd`, `libc6-i386`, `lib32gcc-s1`, `lib32stdc++6`, `curl`, `bzip2`, `tar`, `rsync`, `sed`, `perl-modules`, `lsof`. (Previous Debian 12 extras like `libncurses5`, `libncursesw5`, `libsdl2-2.0-0` dropped — not required by arkmanager v1.6.68.) On Debian: enable `contrib non-free` in `/etc/apt/sources.list` + add `i386` foreign arch. On Ubuntu: enable `multiverse`.
+- [ ] **ARK-12**: `_fix_steam_sdk` applies to Palworld only. ARK's steamcmd SDK setup is handled entirely by arkmanager + the apt `steamcmd` package. `GAMES["ark"].post_install_hooks` omits `_fix_steam_sdk`.
+- [ ] **ARK-13**: RCON triad alignment — install writes `ark_RCONEnabled="True"`, `ark_RCONPort="<rcon_port>"`, `ark_ServerAdminPassword="<admin_password>"` to main.cfg. arkmanager appends `?RCONEnabled=True?RCONPort=<port>` to launch args automatically.
+- [ ] **ARK-14** *(new)*: `logpose ark install` installs arkmanager via the upstream netinstall.sh (`curl -sL https://raw.githubusercontent.com/arkmanager/ark-server-tools/master/netinstall.sh | bash -s steam`) when not already present. Idempotent — skips netinstall if `/usr/local/bin/arkmanager` exists.
+- [ ] **ARK-15** *(new)*: `logpose ark install` pre-accepts the Steam EULA non-interactively via `debconf-set-selections` for `steam/question` and `steamcmd/question` ("I AGREE") before `apt-get install steamcmd`.
+- [ ] **ARK-16** *(new)*: `logpose ark install` creates the `steam` service user (`useradd -m -s /bin/bash steam`) if absent; no password set (access is only via `sudo -u steam`).
+- [ ] **ARK-17** *(new)*: `logpose ark install` runs `sudo -u steam arkmanager install --beta=<branch> --validate` TWICE to work around steamcmd's known first-run self-update quirk (the first invocation exits 0 with no payload after self-updating). Second invocation downloads the actual server files.
+- [ ] **ARK-18** *(new)*: `logpose ark install` drops a sudoers fragment at `/etc/sudoers.d/logpose-ark` granting passwordless access: `<invoking-user> ALL=(steam) NOPASSWD: /usr/local/bin/arkmanager *`. Removed cleanly on `logpose ark uninstall`.
+- [ ] **ARK-19** *(new)*: `logpose ark <start|stop|restart|status|saveworld|backup|update|rconcmd>` delegate to `sudo -u steam arkmanager <verb>`, surfacing return code + tail of stderr to the user. `update` runs twice (same self-update quirk as install).
 
 ### Settings Editor
 
@@ -183,6 +191,12 @@ Requirements for initial `logpose-launcher` release on PyPI.
 | ARK-11 | Phase 5 | Pending |
 | ARK-12 | Phase 5 | Pending |
 | ARK-13 | Phase 5 | Pending |
+| ARK-14 | Phase 5 | Pending |
+| ARK-15 | Phase 5 | Pending |
+| ARK-16 | Phase 5 | Pending |
+| ARK-17 | Phase 5 | Pending |
+| ARK-18 | Phase 5 | Pending |
+| ARK-19 | Phase 5 | Pending |
 | SET-01 | Phase 2 | Pending |
 | SET-02 | Phase 5 | Pending |
 | SET-03 | Phase 4 | Pending |
@@ -200,8 +214,8 @@ Requirements for initial `logpose-launcher` release on PyPI.
 | E2E-06 | Phase 6 | Pending |
 
 **Coverage:**
-- v1 requirements: 56 total
-- Mapped to phases: 56
+- v1 requirements: 62 total (56 original + 6 added 2026-04-12 by the Phase 5 arkmanager pivot: ARK-14..ARK-19)
+- Mapped to phases: 62
 - Unmapped: 0 ✓
 
 ---

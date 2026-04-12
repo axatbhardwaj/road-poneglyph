@@ -70,18 +70,32 @@
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 5: Add ARK Entry + E2E
-**Goal**: ARK: Survival Evolved joins the registry as a first-class game — install, configure, start, stop, edit-settings, and E2E verification on a fresh Debian 12 VM all work end-to-end without sudo prompts.
+### Phase 5: Add ARK Entry + E2E (arkmanager wrapper)
+**Goal**: ARK: Survival Evolved joins the registry as a first-class game — but instead of re-implementing the install/start/stop/save pipeline natively, logpose wraps the mature `arkmanager` (ark-server-tools) Bash harness under the hood. `logpose ark <verb>` provides a uniform CLI on top of arkmanager, manages `/etc/arkmanager/instances/main.cfg`, and preserves Palworld's native path untouched. E2E verified on fresh Debian 12 (compat) and Debian 13 (primary per install record).
 **Depends on**: Phase 4
-**Requirements**: ARK-01, ARK-02, ARK-03, ARK-04, ARK-05, ARK-06, ARK-07, ARK-08, ARK-09, ARK-10, ARK-11, ARK-12, ARK-13, SET-02, SET-04, POL-05 (ARK verification), PAL-09 (byte-diff second half), E2E-03, E2E-04
+**Pivot (2026-04-12):** Phase 5 pivots from native steamcmd + custom systemd unit + `GameUserSettings.ini` parser to arkmanager delegation. Rationale: arkmanager v1.6.68 already solves steamcmd self-update quirks, branch opt-outs (preaquatica), start/stop/backup/RCON, and works on both Debian and Ubuntu. Delegating preserves Palworld's symmetry while cutting scope. Install record at `docs/ark-install-reference.md` is the reference implementation.
+**Requirements**: ARK-01..ARK-19 (ARK-14..ARK-19 added by the arkmanager pivot), SET-02, SET-04, POL-05 (ARK verification — may reduce since arkmanager uses `sudo -u steam`, not a systemd service owned by the installing user), PAL-09 (byte-diff second half), E2E-03, E2E-04
 **Success Criteria** (what must be TRUE):
-  1. `logpose ark install --map TheIsland --admin-password XXX --start` on a fresh Debian 12 VM installs required 32-bit apt deps (`lib32gcc-s1` with `lib32gcc1` fallback, `libc6-i386`, `libncurses5`, `libncursesw5`, `libsdl2-2.0-0`, `lib32stdc++6`), lays down `steamclient.so` in both `~/.steam/sdk32/` and `~/.steam/sdk64/` plus the Engine symlink, and brings `arkserver.service` up with zero sudo prompts.
-  2. `arkserver.service.template` renders with `LimitNOFILE=100000`, `KillSignal=SIGINT`, `TimeoutStopSec=300`, `Type=exec`, direct-binary `ExecStart` (no shell wrapper); `palserver.service` output remains byte-identical to v0.1.19 under the Phase 2 harness.
-  3. `logpose ark edit-settings` reads and writes `GameUserSettings.ini` via `RawConfigParser(strict=False, interpolation=None, allow_no_value=True, delimiters=("=",), comment_prefixes=(";","#"))` with `cp.optionxform = str`; CamelCase keys and untouched keys survive round-trip.
-  4. Install flow validates map against the 12-map enum, probes port collisions via `ss -tuln` before install, writes SessionName only to `[SessionSettings]` (never launch args, 63-char soft warning enforced), and aligns the RCON triad (`RCONEnabled=True` + `RCONPort=<port>` + `ServerAdminPassword=<pw>` in INI AND `?RCONEnabled=True?RCONPort=<port>` in launch args); `--admin-password` is required (hidden prompt) or generated via `secrets.token_urlsafe(16)` only with an explicit flag and printed once.
-  5. `systemctl stop arkserver` completes a clean save within `TimeoutStopSec`; `pkcheck` verifies both `palserver.service` and `arkserver.service` are managed sudo-lessly by the installing user; RCON is reachable on the configured `rcon_port`.
+  1. `logpose ark install --map TheIsland --admin-password XXX --start` on a fresh Debian 12 or Debian 13 VM:
+     - enables `contrib non-free` in apt sources (Debian only; Ubuntu already exposes these as `multiverse`),
+     - adds i386 foreign architecture,
+     - pre-accepts the `steam`/`steamcmd` EULA via `debconf-set-selections`,
+     - installs apt deps (`steamcmd`, `libc6-i386`, `lib32gcc-s1`, `lib32stdc++6`, `curl`, `bzip2`, `tar`, `rsync`, `sed`, `perl-modules`, `lsof`),
+     - creates the `steam` service user if absent (`useradd -m -s /bin/bash steam`),
+     - installs arkmanager v1.6.68+ via the upstream netinstall.sh (`curl -sL https://raw.githubusercontent.com/arkmanager/ark-server-tools/master/netinstall.sh | bash -s steam`),
+     - runs `sudo -u steam arkmanager install --beta=preaquatica --validate` **twice** (first call self-updates steamcmd and exits 0 with zero payload — known quirk),
+     - starts via `sudo -u steam arkmanager start`.
+  2. `logpose ark install` materialises `/etc/arkmanager/instances/main.cfg` from `GAMES["ark"]` values (arkserverroot, serverMap, ark_SessionName, ark_Port, ark_QueryPort, ark_RCONEnabled, ark_RCONPort, ark_ServerPassword, ark_ServerAdminPassword, ark_MaxPlayers). Unrelated keys in `main.cfg` are preserved (in-place edit, not rewrite).
+  3. `logpose ark edit-settings` edits `/etc/arkmanager/instances/main.cfg` via the shared Rich-table editor (same UX as Palworld's `edit-settings`). The arkmanager `ark_*` key set becomes the `SettingsAdapter` parse/save target. `GameUserSettings.ini` is NOT directly edited by logpose in this milestone (arkmanager owns it); `logpose ark edit-settings --game-ini` is deferred to a future milestone if needed.
+  4. `logpose ark start|stop|restart|status|saveworld|backup|update` delegate to `sudo -u steam arkmanager <verb>` with return codes + last-line output surfaced to the user.
+  5. Install flow validates map against arkmanager's supported set (`TheIsland`, `TheCenter`, `ScorchedEarth_P`, `Aberration_P`, `Extinction`, `Ragnarok`, `Valguero_P`, `CrystalIsles`, `LostIsland`, `Fjordur`, `Genesis`, `Genesis2`), probes ports 7777/udp, 7778/udp, 27015/udp, 27020/tcp via `ss -tuln` before install, and aligns the RCON triad in `main.cfg` (`ark_RCONEnabled=True` + `ark_RCONPort=<port>` + `ark_ServerAdminPassword=<pw>`). `--admin-password` is required (hidden prompt) or generated via `secrets.token_urlsafe(16)` only with an explicit `--generate-password` flag and printed once.
+  6. `palserver.service` output remains byte-identical to v0.1.19 under the Phase 2 harness (Palworld path unchanged; only ARK is delegated to arkmanager).
+  7. `logpose ark stop` completes a clean save within arkmanager's default timeout; RCON is reachable on the configured `ark_RCONPort`.
+  8. **Polkit/sudo posture — ARK is different from Palworld.** arkmanager uses `sudo -u steam`, not a systemd service owned by the installing user. So POL-05 (sudo-less service management) applies to Palworld only in v0.2.0; ARK uses one-time `sudo -u steam` invocations that the installing user authorises via passwordless NOPASSWD entry (`<user> ALL=(steam) NOPASSWD: /usr/local/bin/arkmanager *`). `logpose ark install` drops this sudoers fragment in `/etc/sudoers.d/logpose-ark`. Documented in README and Phase 6 migration note.
+  9. **Auto-start at boot is opt-in.** A systemd unit `arkserver.service` (thin wrapper: `ExecStart=/usr/bin/sudo -u steam /usr/local/bin/arkmanager start`, `ExecStop=/usr/bin/sudo -u steam /usr/local/bin/arkmanager stop`, `Type=forking` since arkmanager backgrounds the server, `RemainAfterExit=yes`) is created but **not enabled by default**. `logpose ark install --enable-autostart` opts in.
 **Plans**: TBD
 **UI hint**: yes
+**Reference**: `docs/ark-install-reference.md` (working install record, 2026-04-12, Debian 13 trixie, preaquatica beta, arkmanager v1.6.68)
 
 ### Phase 6: Release Polish + PyPI
 **Goal**: `logpose-launcher` v0.2.0 ships to PyPI with a verified wheel, the README reflects the multi-game CLI, and the v0.1.19 `palworld-server-launcher` release is left untouched.
@@ -91,7 +105,7 @@
   1. A clean local build (`rm -rf build dist *.egg-info` then `python -m build`) produces a wheel whose `*.dist-info/METADATA` shows `Name: logpose-launcher` and `Version: 0.2.0`.
   2. TestPyPI dry-run publish succeeds; `pip install -i https://test.pypi.org/simple/ logpose-launcher` in a throwaway venv installs, and `logpose --help` post-install shows both `palworld` and `ark` sub-commands.
   3. `logpose-launcher` v0.2.0 is published to production PyPI; `palworld-server-launcher` v0.1.19 remains frozen and untouched.
-  4. `README.md` includes: new `logpose palworld ...` / `logpose ark ...` examples for every verb, migration note for existing v0.1.19 users (new install, not upgrade), per-game firewall port reference (8211/UDP for Palworld; 7777/UDP, 27015/UDP, 27020/TCP for ARK), and manual polkit cleanup instructions for the old `40-palserver.rules`.
+  4. `README.md` includes: new `logpose palworld ...` / `logpose ark ...` examples for every verb, migration note for existing v0.1.19 users (new install, not upgrade), per-game firewall port reference (8211/UDP for Palworld; 7777/UDP game + 7778/UDP raw socket + 27015/UDP query + 27020/TCP RCON for ARK), manual polkit cleanup instructions for the old `40-palserver.rules`, and — new for v0.2.0 — ARK's sudoers fragment at `/etc/sudoers.d/logpose-ark` and the opt-in `arkserver.service` systemd unit (disabled by default; enabled via `--enable-autostart` at install time).
 **Plans**: TBD
 
 ## Dependencies
@@ -117,7 +131,7 @@ Phases execute strictly in order — each phase's behavior contract depends on t
 | 2 — Parameterize Helpers | No | — | Byte-diff harness is the only novelty; spec already captured in `research/ARCHITECTURE.md`. |
 | 3 — GameSpec + GAMES | No | — | Schema fully specified in `research/ARCHITECTURE.md`. |
 | 4 — Typer Factory + Polkit | Low | Low | Brief verification on Debian 12 of polkit JS array merge under `str.format()`; fallback to two-file rule documented as exit-criteria option. |
-| **5 — ARK + E2E** | **Yes** | **HIGH** | Recommend `/gsd-research-phase` during planning: confirm exact 32-bit apt package names per target distro (Debian 12 vs Ubuntu 22.04+), current-year ARK signal handling on `SIGINT`, BattlEye default state, `[SessionSettings]` vs `[ServerSettings]` key placement, RCON port convention. Six of the top ten risks concentrate in this phase. |
+| **5 — ARK + E2E (arkmanager wrapper)** | **Yes** | **MEDIUM** | Research scope narrowed by the 2026-04-12 pivot. Still needed: arkmanager netinstall idempotency on re-run, arkmanager config format edge cases (quoted vs unquoted values, comment preservation), `main.cfg` line-ending normalisation, `sudo -u steam arkmanager` exit-code semantics, Debian 12 vs Debian 13 i386 lib availability. Reference implementation already captured in `docs/ark-install-reference.md` — research validates edge cases, not approach. |
 | 6 — Release Polish | No | — | Standard PyPI publishing; TestPyPI flow is well-trodden. |
 
 ## Progress
@@ -133,7 +147,7 @@ Phases execute strictly in order — each phase's behavior contract depends on t
 
 ## Coverage
 
-- v1 requirements: **56 / 56 mapped** ✓
+- v1 requirements: **62 / 62 mapped** ✓ (56 original + ARK-14..ARK-19 added by the 2026-04-12 arkmanager pivot)
 - Orphaned requirements: **0** ✓
 - Phases without requirements: **0** ✓
 - Source of truth: `.planning/REQUIREMENTS.md` Traceability table

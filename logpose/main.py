@@ -186,13 +186,12 @@ def _write_service_file(service_file: Path, content: str) -> None:
     _run_command("sudo systemctl daemon-reload")
 
 
-def _setup_polkit() -> None:
-    """Allow user to control the service without sudo."""
+def _setup_polkit(rules_filename: str, template_name: str, user: str) -> None:
+    """Allow `user` to control the service without sudo via a polkit rule file."""
     console.print("Setting up policy for non-sudo control...")
-    user = Path.home().name
-    policy_file = Path("/etc/polkit-1/rules.d/40-palserver.rules")
+    policy_file = Path("/etc/polkit-1/rules.d") / rules_filename
     _run_command(f"sudo mkdir -p {policy_file.parent}")
-    template = _get_template("palserver.rules.template")
+    template = _get_template(template_name)
     policy_content = template.format(user=user)
     _run_command(f"echo '{policy_content}' | sudo tee {policy_file}")
     _run_command("sudo systemctl restart polkit.service")
@@ -238,11 +237,15 @@ def _palworld_save(path: Path, settings: dict[str, str]) -> None:
     console.print("Settings saved successfully.")
 
 
-def _create_settings_from_default() -> None:
-    """Creates PalWorldSettings.ini from the default template."""
-    if not DEFAULT_PAL_SETTINGS_PATH.exists():
+def _create_settings_from_default(
+    default_path: Path,
+    dst_path: Path,
+    section_rename: Optional[tuple[str, str]],
+) -> None:
+    """Create a settings file from a default template, optionally renaming a section header."""
+    if not default_path.exists():
         console.print(
-            f"Default configuration file not found at {DEFAULT_PAL_SETTINGS_PATH}",
+            f"Default configuration file not found at {default_path}",
             file=sys.stderr,
         )
         console.print(
@@ -254,14 +257,13 @@ def _create_settings_from_default() -> None:
     console.print(
         "Configuration file is missing, empty, or corrupted. Creating a new one from default settings."
     )
-    PAL_SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    content = DEFAULT_PAL_SETTINGS_PATH.read_text()
-    # The game uses PalGameWorldSettings in the saved config, so we replace the section header
-    content = content.replace(
-        "[/Script/Pal.PalWorldSettings]",
-        "[/Script/Pal.PalGameWorldSettings]",
-    )
-    PAL_SETTINGS_PATH.write_text(content)
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
+    content = default_path.read_text()
+    if section_rename is not None:
+        # Game-specific behavior: some games need the section header renamed when
+        # copying the default template into the saved config. ARK passes None.
+        content = content.replace(section_rename[0], section_rename[1])
+    dst_path.write_text(content)
 
 
 def _display_settings(settings: dict[str, str]) -> None:

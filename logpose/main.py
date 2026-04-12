@@ -188,9 +188,10 @@ def _setup_polkit() -> None:
     _run_command("sudo systemctl restart polkit.service")
 
 
-def _parse_settings() -> dict[str, str]:
-    """Parses the PalWorldSettings.ini file."""
-    content = PAL_SETTINGS_PATH.read_text()
+def _palworld_parse(path: Path) -> dict[str, str]:
+    """Parses a Palworld PalWorldSettings.ini file."""
+    # verbatim from v0.1.19 _parse_settings — PAL-03 invariant
+    content = path.read_text()
     match = re.search(r"OptionSettings=\((.*)\)", content)
     if not match:
         raise ValueError("Could not find OptionSettings in PalWorldSettings.ini")

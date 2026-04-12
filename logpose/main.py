@@ -18,9 +18,6 @@ from rich.console import Console
 app = typer.Typer()
 console = Console()
 STEAM_DIR = Path.home() / ".steam/steam"
-PAL_SERVER_DIR = STEAM_DIR / "steamapps/common/PalServer"
-PAL_SETTINGS_PATH = PAL_SERVER_DIR / "Pal/Saved/Config/LinuxServer/PalWorldSettings.ini"
-DEFAULT_PAL_SETTINGS_PATH = PAL_SERVER_DIR / "DefaultPalWorldSettings.ini"
 
 
 @dataclass(frozen=True)
@@ -165,12 +162,6 @@ def _run_steamcmd_update(server_dir: Path, app_id: int) -> None:
     server_script = server_dir / "PalServer.sh"
     if server_script.exists():
         _run_command(f"chmod +x {server_script}")
-
-
-def _install_palworld(server_dir: Path, app_id: int) -> None:
-    """Install Palworld dedicated server using steamcmd."""
-    console.print("Installing Palworld dedicated server...")
-    _run_steamcmd_update(server_dir, app_id)
 
 
 def _fix_steam_sdk(steam_sdk_dst: Path, steam_client_so: Path) -> None:
@@ -389,29 +380,31 @@ def install(
         rich.print("This script should not be run as root. Exiting.", file=sys.stderr)
         sys.exit(1)
 
+    spec = GAMES["palworld"]
+
     _install_steamcmd()
-    _install_palworld(PAL_SERVER_DIR, 2394010)
+    _run_steamcmd_update(spec.server_dir, spec.app_id)
     _fix_steam_sdk(
         Path.home() / ".steam/sdk64",
         STEAM_DIR / "steamapps/common/Steamworks SDK Redist/linux64/steamclient.so",
     )
     service_content = _render_service_file(
-        service_name="palserver",
-        template_name="palserver.service.template",
+        service_name=spec.service_name,
+        template_name=spec.service_template_name,
         user=Path.home().name,
-        working_directory=PAL_SERVER_DIR,
-        exec_start_path=PAL_SERVER_DIR / "PalServer.sh",
+        working_directory=spec.server_dir,
+        exec_start_path=spec.server_dir / spec.binary_rel_path,
         port=port,
         players=players,
     )
-    _write_service_file(Path("/etc/systemd/system/palserver.service"), service_content)
+    _write_service_file(Path(f"/etc/systemd/system/{spec.service_name}.service"), service_content)
     _setup_polkit("40-palserver.rules", "palserver.rules.template", Path.home().name)
 
     console.print("Installation complete!")
 
     if start:
         console.print("Starting the server...")
-        _run_command("systemctl start palserver")
+        _run_command(f"systemctl start {spec.service_name}")
         console.print("Server started successfully!")
     else:
         console.print(
@@ -426,63 +419,68 @@ def install(
 @app.command()
 def start() -> None:
     """Start the Palworld server."""
-    _run_command("systemctl start palserver")
+    spec = GAMES["palworld"]
+    _run_command(f"systemctl start {spec.service_name}")
 
 
 @app.command()
 def stop() -> None:
     """Stop the Palworld server."""
-    _run_command("systemctl stop palserver")
+    spec = GAMES["palworld"]
+    _run_command(f"systemctl stop {spec.service_name}")
 
 
 @app.command()
 def restart() -> None:
     """Restart the Palworld server."""
-    _run_command("systemctl restart palserver")
+    spec = GAMES["palworld"]
+    _run_command(f"systemctl restart {spec.service_name}")
 
 
 @app.command()
 def status() -> None:
     """Check the status of the Palworld server."""
-    _run_command("systemctl status palserver", check=False)
+    spec = GAMES["palworld"]
+    _run_command(f"systemctl status {spec.service_name}", check=False)
 
 
 @app.command()
 def enable() -> None:
     """Enable the Palworld server to start on boot."""
-    _run_command("systemctl enable palserver")
+    spec = GAMES["palworld"]
+    _run_command(f"systemctl enable {spec.service_name}")
 
 
 @app.command()
 def disable() -> None:
     """Disable the Palworld server from starting on boot."""
-    _run_command("systemctl disable palserver")
+    spec = GAMES["palworld"]
+    _run_command(f"systemctl disable {spec.service_name}")
 
 
 @app.command()
 def update() -> None:
     """Update the Palworld dedicated server."""
+    spec = GAMES["palworld"]
     console.print("Updating Palworld dedicated server...")
-    _run_steamcmd_update(PAL_SERVER_DIR, 2394010)
+    _run_steamcmd_update(spec.server_dir, spec.app_id)
     console.print("Update complete! Restart the server for the changes to take effect.")
 
 
 @app.command(name="edit-settings")
 def edit_settings() -> None:
     """Edit the PalWorldSettings.ini file."""
+    spec = GAMES["palworld"]
     try:
-        settings = _palworld_parse(PAL_SETTINGS_PATH)
+        settings = spec.settings_adapter.parse(spec.settings_path)
     except (FileNotFoundError, ValueError):
         _create_settings_from_default(
-            DEFAULT_PAL_SETTINGS_PATH,
-            PAL_SETTINGS_PATH,
-            (
-                "[/Script/Pal.PalWorldSettings]",
-                "[/Script/Pal.PalGameWorldSettings]",
-            ),
+            spec.default_settings_path,
+            spec.settings_path,
+            spec.settings_section_rename,
         )
         try:
-            settings = _palworld_parse(PAL_SETTINGS_PATH)
+            settings = spec.settings_adapter.parse(spec.settings_path)
         except (ValueError, FileNotFoundError) as e:
             rich.print(
                 f"An error occurred after creating default settings: {e}",
@@ -492,7 +490,7 @@ def edit_settings() -> None:
 
     try:
         _interactive_edit_loop(settings)
-        _palworld_save(PAL_SETTINGS_PATH, settings)
+        spec.settings_adapter.save(spec.settings_path, settings)
     except Exception as e:
         rich.print(f"An error occurred during settings edit: {e}", file=sys.stderr)
         sys.exit(1)

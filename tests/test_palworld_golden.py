@@ -103,6 +103,29 @@ def test_render_service_file_byte_identical_to_golden() -> None:
     )
 
 
+def test_polkit_rule_byte_identical_to_v0_2_0_golden() -> None:
+    """Merged polkit rule render must match the committed golden byte-for-byte.
+
+    Renders 40-logpose.rules.template with the real GAMES-driven units
+    substitution (Palworld-only in Phase 4; ARK slots in during Phase 5 —
+    that phase will re-capture the golden at the same time as it adds
+    GAMES['ark']). user='foo' matches the fixture used by the palserver
+    tests in this file.
+    """
+    from logpose.main import GAMES
+
+    template = (ROOT / "logpose" / "templates" / "40-logpose.rules.template").read_text()
+    units = ", ".join(f'"{spec.service_name}.service"' for spec in GAMES.values())
+    rendered = template.format(units=units, user="foo").encode("utf-8")
+    expected = (ROOT / "tests" / "golden" / "40-logpose.rules.v0_2_0").read_bytes()
+    assert rendered == expected, (
+        f"40-logpose.rules render drift vs v0.2.0 golden "
+        f"(rendered={len(rendered)} bytes, golden={len(expected)} bytes). "
+        f"If GAMES registry changed (e.g. Phase 5 added 'ark'), re-capture the golden "
+        f"and update this test's docstring."
+    )
+
+
 if __name__ == "__main__":
     # Script-mode entrypoint (phase success criterion #3: "script exits 0").
     # Runs both tests; the v0.1.19-tag test degrades to a skip-but-pass if git unavailable.
@@ -146,5 +169,14 @@ if __name__ == "__main__":
         print(f"FAIL: cannot import _render_service_file (logpose.main broken): {exc}", file=sys.stderr)
         sys.exit(1)
 
-    print("OK: palserver.service matches v0.1.19 golden (template + real render path)")
+    try:
+        test_polkit_rule_byte_identical_to_v0_2_0_golden()
+    except AssertionError as exc:
+        print(f"FAIL: test_polkit_rule_byte_identical_to_v0_2_0_golden: {exc}", file=sys.stderr)
+        sys.exit(1)
+    except ImportError as exc:
+        print(f"FAIL: cannot import logpose.main (module broken): {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    print("OK: palserver.service + 40-logpose.rules match v0.1.19/v0.2.0 goldens")
     sys.exit(0)

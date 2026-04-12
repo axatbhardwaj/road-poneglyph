@@ -1,0 +1,8 @@
+polkit.addRule(function(action, subject) {
+    var units = ["palserver.service"];
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        units.indexOf(action.lookup("unit")) !== -1 &&
+        subject.user === "foo") {
+        return polkit.Result.YES;
+    }
+});

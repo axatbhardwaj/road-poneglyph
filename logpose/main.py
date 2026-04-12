@@ -8,6 +8,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from string import Formatter
 from typing import Callable, Optional
 import re
 
@@ -210,13 +211,19 @@ def _write_service_file(service_file: Path, content: str) -> None:
     _run_command("sudo systemctl daemon-reload")
 
 
-def _setup_polkit(rules_filename: str, template_name: str, user: str) -> None:
-    """Allow `user` to control the service without sudo via a polkit rule file."""
-    console.print("Setting up policy for non-sudo control...")
-    policy_file = Path("/etc/polkit-1/rules.d") / rules_filename
+def _setup_polkit(user: str) -> None:
+    """Allow `user` to control every registered game service without sudo."""
+    console.print("Setting up policy for non-sudo control of all registered games...")
+    policy_file = Path("/etc/polkit-1/rules.d/40-logpose.rules")
     _run_command(f"sudo mkdir -p {policy_file.parent}")
-    template = _get_template(template_name)
-    policy_content = template.format(user=user)
+    units = ", ".join(f'"{spec.service_name}.service"' for spec in GAMES.values())
+    template = _get_template("40-logpose.rules.template")
+    # Placeholder audit — fails fast if the template drifts
+    placeholders = {f[1] for f in Formatter().parse(template) if f[1]}
+    assert placeholders == {"units", "user"}, (
+        f"40-logpose.rules.template placeholder drift: {placeholders}"
+    )
+    policy_content = template.format(units=units, user=user)
     _run_command(f"echo '{policy_content}' | sudo tee {policy_file}")
     _run_command("sudo systemctl restart polkit.service")
 
@@ -414,7 +421,7 @@ def _build_game_app(spec: GameSpec) -> typer.Typer:
         _write_service_file(
             Path(f"/etc/systemd/system/{spec.service_name}.service"), service_content
         )
-        _setup_polkit("40-palserver.rules", "palserver.rules.template", Path.home().name)
+        _setup_polkit(Path.home().name)
 
         console.print("Installation complete!")
 

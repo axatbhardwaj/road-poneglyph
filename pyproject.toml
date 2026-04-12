@@ -3,12 +3,12 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "palworld-server-launcher"
+name = "logpose-launcher"
 version = "0.1.19"
 authors = [
     { name = "axatbhardwaj", email = "axatbhardwaj@gmail.com" },
 ]
-description = "A simple tool to install and manage a Palworld dedicated server on Linux."
+description = "A Linux dedicated game server launcher for Palworld and ARK: Survival Evolved — manages steamcmd, systemd, and polkit on Debian/Ubuntu."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.8"
@@ -17,15 +17,15 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
 ]
 dependencies = [
-    "typer",
-    "rich",
+    "typer>=0.9,<0.21",
+    "rich>=13.0,<14",
 ]
 
 [project.scripts]
-palworld-server-launcher = "palworld_server_launcher.main:app"
+logpose = "logpose.main:app"
 
 [tool.setuptools]
-packages = ["palworld_server_launcher"]
+packages = ["logpose"]
 
 [tool.setuptools.package-data]
-"palworld_server_launcher" = ["templates/*"]
+"logpose" = ["templates/*"]

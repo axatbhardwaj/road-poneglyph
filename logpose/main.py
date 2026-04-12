@@ -384,10 +384,8 @@ def install(
 
     _install_steamcmd()
     _run_steamcmd_update(spec.server_dir, spec.app_id)
-    _fix_steam_sdk(
-        Path.home() / ".steam/sdk64",
-        STEAM_DIR / "steamapps/common/Steamworks SDK Redist/linux64/steamclient.so",
-    )
+    for hook in spec.post_install_hooks:
+        hook()
     service_content = _render_service_file(
         service_name=spec.service_name,
         template_name=spec.service_template_name,

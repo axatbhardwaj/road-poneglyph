@@ -321,10 +321,22 @@ def install(
         sys.exit(1)
 
     _install_steamcmd()
-    _install_palworld()
-    _fix_steam_sdk()
-    _create_service_file(port, players)
-    _setup_polkit()
+    _install_palworld(PAL_SERVER_DIR, 2394010)
+    _fix_steam_sdk(
+        Path.home() / ".steam/sdk64",
+        STEAM_DIR / "steamapps/common/Steamworks SDK Redist/linux64/steamclient.so",
+    )
+    service_content = _render_service_file(
+        service_name="palserver",
+        template_name="palserver.service.template",
+        user=Path.home().name,
+        working_directory=PAL_SERVER_DIR,
+        exec_start_path=PAL_SERVER_DIR / "PalServer.sh",
+        port=port,
+        players=players,
+    )
+    _write_service_file(Path("/etc/systemd/system/palserver.service"), service_content)
+    _setup_polkit("40-palserver.rules", "palserver.rules.template", Path.home().name)
 
     console.print("Installation complete!")
 
@@ -382,7 +394,7 @@ def disable() -> None:
 def update() -> None:
     """Update the Palworld dedicated server."""
     console.print("Updating Palworld dedicated server...")
-    _run_steamcmd_update()
+    _run_steamcmd_update(PAL_SERVER_DIR, 2394010)
     console.print("Update complete! Restart the server for the changes to take effect.")
 
 
@@ -392,7 +404,14 @@ def edit_settings() -> None:
     try:
         settings = _palworld_parse(PAL_SETTINGS_PATH)
     except (FileNotFoundError, ValueError):
-        _create_settings_from_default()
+        _create_settings_from_default(
+            DEFAULT_PAL_SETTINGS_PATH,
+            PAL_SETTINGS_PATH,
+            (
+                "[/Script/Pal.PalWorldSettings]",
+                "[/Script/Pal.PalGameWorldSettings]",
+            ),
+        )
         try:
             settings = _palworld_parse(PAL_SETTINGS_PATH)
         except (ValueError, FileNotFoundError) as e:

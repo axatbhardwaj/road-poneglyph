@@ -126,30 +126,29 @@ def _install_steamcmd() -> None:
         _run_command("sudo dpkg-reconfigure -fnoninteractive steamcmd", check=False)
 
 
-def _run_steamcmd_update():
-    """Runs steamcmd to install/update Palworld server."""
-    _run_command(f"steamcmd +force_install_dir '{PAL_SERVER_DIR}' +login anonymous +app_update 2394010 validate +quit")
-    pal_server_script = PAL_SERVER_DIR / "PalServer.sh"
-    if pal_server_script.exists():
-        _run_command(f"chmod +x {pal_server_script}")
+def _run_steamcmd_update(server_dir: Path, app_id: int) -> None:
+    """Runs steamcmd to install/update the dedicated server for the given app."""
+    _run_command(
+        f"steamcmd +force_install_dir '{server_dir}' +login anonymous "
+        f"+app_update {app_id} validate +quit"
+    )
+    server_script = server_dir / "PalServer.sh"
+    if server_script.exists():
+        _run_command(f"chmod +x {server_script}")
 
 
-def _install_palworld() -> None:
+def _install_palworld(server_dir: Path, app_id: int) -> None:
     """Install Palworld dedicated server using steamcmd."""
     console.print("Installing Palworld dedicated server...")
-    _run_steamcmd_update()
+    _run_steamcmd_update(server_dir, app_id)
 
 
-def _fix_steam_sdk() -> None:
-    """Fix Steam SDK errors."""
+def _fix_steam_sdk(steam_sdk_dst: Path, steam_client_so: Path) -> None:
+    """Copy steamclient.so into the game's Steam SDK directory (Palworld: sdk64 only)."""
     console.print("Fixing Steam SDK errors...")
-    steam_sdk_path = Path.home() / ".steam/sdk64"
-    steam_sdk_path.mkdir(parents=True, exist_ok=True)
-    steam_client_so = (
-        STEAM_DIR / "steamapps/common/Steamworks SDK Redist/linux64/steamclient.so"
-    )
+    steam_sdk_dst.mkdir(parents=True, exist_ok=True)
     if steam_client_so.exists():
-        _run_command(f"cp {steam_client_so} {steam_sdk_path}/")
+        _run_command(f"cp {steam_client_so} {steam_sdk_dst}/")
     else:
         rich.print(
             f"Warning: {steam_client_so} not found. This might cause issues.",

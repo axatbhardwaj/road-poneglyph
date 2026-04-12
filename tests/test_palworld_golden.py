@@ -19,6 +19,13 @@ ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE = ROOT / "logpose" / "templates" / "palserver.service.template"
 GOLDEN = ROOT / "tests" / "golden" / "palserver.service.v0_1_19"
 
+# Ensure `logpose` is importable whether this file is run via pytest or
+# `python tests/test_palworld_golden.py`. Pytest injects rootdir automatically;
+# script mode only adds the script's own directory to sys.path. Plan 05's new
+# test imports `logpose.main`, so the repo root must be on sys.path in both modes.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 FIXTURE = {
     "user": "foo",
     "port": 8211,
@@ -68,6 +75,34 @@ def test_golden_matches_v0_1_19_tag() -> None:
     )
 
 
+def test_render_service_file_byte_identical_to_golden() -> None:
+    """Real code path: _render_service_file must produce byte-identical output to the golden.
+
+    This is the Pitfall 4 defender — if the harness only tests template.format() directly,
+    a broken _render_service_file helper would sneak past unnoticed. This test imports the
+    real helper, calls it with the fixture, and enforces byte-equality against the golden.
+    """
+    from logpose.main import _render_service_file
+
+    rendered_str = _render_service_file(
+        service_name="palserver",
+        template_name="palserver.service.template",
+        user=FIXTURE["user"],
+        working_directory=Path(FIXTURE["working_directory"]),
+        exec_start_path=Path(FIXTURE["exec_start_path"]),
+        port=FIXTURE["port"],
+        players=FIXTURE["players"],
+    )
+    rendered_bytes = rendered_str.encode("utf-8")
+    expected = GOLDEN.read_bytes()
+    assert rendered_bytes == expected, (
+        f"_render_service_file drift vs v0.1.19 golden "
+        f"(rendered={len(rendered_bytes)} bytes, golden={len(expected)} bytes). "
+        f"Helper body diverged from template.format path — inspect logpose/main.py "
+        f"_render_service_file and compare placeholder wiring against the template."
+    )
+
+
 if __name__ == "__main__":
     # Script-mode entrypoint (phase success criterion #3: "script exits 0").
     # Runs both tests; the v0.1.19-tag test degrades to a skip-but-pass if git unavailable.
@@ -102,5 +137,14 @@ if __name__ == "__main__":
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass  # git/tag unavailable — mirror the pytest skip behavior
 
-    print("OK: palserver.service matches v0.1.19 golden")
+    try:
+        test_render_service_file_byte_identical_to_golden()
+    except AssertionError as exc:
+        print(f"FAIL: test_render_service_file_byte_identical_to_golden: {exc}", file=sys.stderr)
+        sys.exit(1)
+    except ImportError as exc:
+        print(f"FAIL: cannot import _render_service_file (logpose.main broken): {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    print("OK: palserver.service matches v0.1.19 golden (template + real render path)")
     sys.exit(0)

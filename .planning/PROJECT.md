@@ -32,13 +32,18 @@
 - [ ] Parameterize `main.py` via a `GAMES` dict keyed by game name — fields: `app_id`, `server_dir`, `settings_path`, `default_settings_path`, `service_name`, `service_template`, `launch_args_template`, `settings_adapter` (callable pair for parse/save)
 - [ ] Refactor existing helpers (`_run_command`, `_install_steamcmd`, `_repair_package_manager`, `_fix_steam_sdk`, `_create_service_file`, `_setup_polkit`) to accept a game key or read game-specific values from the `GAMES` dict — no `BaseGame` class, no `core/` module split
 - [ ] Convert Typer CLI to game-first nested subcommands: `logpose palworld install`, `logpose palworld start`, `logpose ark install`, `logpose ark start`, etc. Every existing command re-exposed per game.
-- [ ] Add ARK: Survival Evolved game entry — SteamCMD app id `376030`, binary `ShooterGame/Binaries/Linux/ShooterGameServer`, multi-port launch args (GamePort 7777 / QueryPort 27015 / RCON 32330 optional), map selection (TheIsland default; Ragnarok, TheCenter, ScorchedEarth, Aberration, Extinction, Valguero, CrystalIsles, Fjordur, LostIsland, Genesis, Genesis2 supported), session name + admin password on install
+- [ ] Add ARK: Survival Evolved game entry — SteamCMD app id `376030`, binary `ShooterGame/Binaries/Linux/ShooterGameServer`, multi-port launch args (GamePort 7777 / QueryPort 27015 / RCON 27020 default), map selection (TheIsland default; Ragnarok, TheCenter, ScorchedEarth, Aberration, Extinction, Valguero, CrystalIsles, Fjordur, LostIsland, Genesis, Gen2 supported), session name + admin password on install
 - [ ] Add ARK settings adapter — standard-INI parser for `ShooterGame/Saved/Config/LinuxServer/GameUserSettings.ini` (configparser-based; preserves sections, comments where feasible) — works out-of-the-box with `logpose ark edit-settings`
 - [ ] Create `arkserver.service` systemd template with ARK launch command
 - [ ] Create per-game polkit rule covering both `palserver.service` and `arkserver.service` for the installing user
 - [ ] Preserve Palworld behavior identically — same service name `palserver.service`, same polkit rule filename (or merged file covering both games), same `OptionSettings` regex parser, same launch args, same settings format
 - [ ] Update `README.md` with new CLI examples for both games + migration note ("this is a new package; `palworld-server-launcher` v0.1.19 stays as-is on PyPI")
-- [ ] Publish `logpose` as a new PyPI package (not renamed) — old `palworld-server-launcher` stays frozen at v0.1.19
+- [ ] Publish `logpose-launcher` as a new PyPI package (the name `logpose` is taken; CLI + import name stay `logpose`) — old `palworld-server-launcher` stays frozen at v0.1.19
+- [ ] Install per-game apt dependencies for ARK (`lib32gcc-s1 libc6-i386 libncurses5 libncursesw5 libsdl2-2.0-0 lib32stdc++6` with `lib32gcc1` fallback) — not installed for Palworld
+- [ ] Generalize `_fix_steam_sdk()` for ARK — requires `steamclient.so` in both `~/.steam/sdk32/` AND `~/.steam/sdk64/` plus symlink into `Engine/Binaries/ThirdParty/SteamCMD/Linux`
+- [ ] ARK systemd unit must set `LimitNOFILE=100000`, `KillSignal=SIGINT`, `TimeoutStopSec=300` for clean save-on-shutdown (Palworld unit stays byte-identical to v0.1.19)
+- [ ] Add `from __future__ import annotations` to every Python module for Python 3.8 PEP-585 compat; pin `typer>=0.9,<0.21` and `rich>=13.0,<14` in `pyproject.toml` (Typer 0.21 dropped 3.8 support)
+- [ ] Remove tracked `palworld_server_launcher.egg-info/` from git and add `*.egg-info/`, `build/`, `dist/` to `.gitignore` — corrupts the `logpose-launcher` wheel build otherwise
 
 ### Out of Scope
 
@@ -74,7 +79,10 @@
 - **Template placeholder escaping**: `{user}`, `{port}`, `{players}`, `{exec_start_path}`, `{working_directory}` for Palworld; ARK needs extras like `{query_port}`, `{rcon_port}`, `{map}`, `{session_name}`, `{admin_password}`. Literal braces in JS (polkit) stay as `{{ }}`.
 - **SteamCMD app ids**: Palworld `2394010`, ARK: Survival Evolved `376030`.
 - **Keep `_repair_package_manager()` intact** — documented as load-bearing in CLAUDE.md.
-- **New PyPI package**: distribution name `logpose` (if available) — verify on PyPI before first publish. Fallback: `logpose-launcher` or `logpose-server-launcher`.
+- **New PyPI package**: distribution name `logpose-launcher` (the unqualified `logpose` is taken on PyPI per research 2026-04-12). CLI entry point + Python import name remain `logpose`.
+- **Python 3.8 floor retained** via pinned deps (`typer>=0.9,<0.21`, `rich>=13.0,<14`); no runtime deps added.
+- **Per-game apt deps**: ARK requires `lib32gcc-s1 libc6-i386 libncurses5 libncursesw5 libsdl2-2.0-0 lib32stdc++6` (with `lib32gcc1` fallback for older Ubuntu). Must be gated by game, not installed for Palworld.
+- **`configparser` constructor for ARK INI**: `RawConfigParser(strict=False, interpolation=None, allow_no_value=True, delimiters=("=",), comment_prefixes=(";","#"))` + `cp.optionxform = str`. Defaults corrupt ARK keys silently.
 
 ## Key Decisions
 
@@ -84,6 +92,7 @@
 | `GAMES` dict over `BaseGame` class | Only 2 games — abstraction cost exceeds benefit. Three similar lines > premature abstraction (per user CLAUDE.md). | — Pending |
 | Game-first nested subcommands (`logpose <game> <command>`) | Matches future `gsl`-style vision (One Piece metaphor aside) and scales cleanly when a 3rd game is added. Closer to `kubectl <resource> <verb>` ergonomics than a `--game` flag. | — Pending |
 | Publish new PyPI package (leave old frozen) | PyPI doesn't support package renames; cleanest is new name + deprecation note on old. No back-compat shims. User accepted explicitly. | — Pending |
+| Distribution name = `logpose-launcher` | `logpose` is taken on PyPI (abandoned ML lib). CLI/import stays `logpose`; only the pip install name differs. Verified via PyPI simple index 2026-04-12. | — Pending |
 | Name = `logpose` (One Piece) | Short (7 chars), typeable, metaphorically clean (navigational pointer to target), user-chosen. | ✓ Good |
 | Debian/Ubuntu only | Existing `_repair_package_manager()` is apt/dpkg-specific; Arch/pacman deferred. User explicitly scoped out. | — Pending |
 | ARK-ASE only (not ASA) | ASA has no native Linux server (Proton/Wine required). ASE has native Linux binary via app id 376030. | — Pending |

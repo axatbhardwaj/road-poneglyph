@@ -2,6 +2,8 @@
 A simple tool to install and manage a Palworld dedicated server on Linux.
 """
 
+from __future__ import annotations
+
 import subprocess
 import sys
 from pathlib import Path

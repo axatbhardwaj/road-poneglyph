@@ -190,7 +190,7 @@ def _setup_polkit() -> None:
 
 def _palworld_parse(path: Path) -> dict[str, str]:
     """Parses a Palworld PalWorldSettings.ini file."""
-    # verbatim from v0.1.19 _parse_settings — PAL-03 invariant
+    # verbatim from v0.1.19 — PAL-03 invariant
     content = path.read_text()
     match = re.search(r"OptionSettings=\((.*)\)", content)
     if not match:
@@ -204,7 +204,7 @@ def _palworld_parse(path: Path) -> dict[str, str]:
 
 def _palworld_save(path: Path, settings: dict[str, str]) -> None:
     """Saves settings back to a Palworld PalWorldSettings.ini file."""
-    # verbatim from v0.1.19 _save_settings — PAL-04 invariant
+    # verbatim from v0.1.19 — PAL-04 invariant
     content = path.read_text()
 
     def should_quote(value: str) -> bool:
@@ -378,11 +378,11 @@ def update() -> None:
 def edit_settings() -> None:
     """Edit the PalWorldSettings.ini file."""
     try:
-        settings = _parse_settings()
+        settings = _palworld_parse(PAL_SETTINGS_PATH)
     except (FileNotFoundError, ValueError):
         _create_settings_from_default()
         try:
-            settings = _parse_settings()
+            settings = _palworld_parse(PAL_SETTINGS_PATH)
         except (ValueError, FileNotFoundError) as e:
             rich.print(
                 f"An error occurred after creating default settings: {e}",
@@ -392,7 +392,7 @@ def edit_settings() -> None:
 
     try:
         _interactive_edit_loop(settings)
-        _save_settings(settings)
+        _palworld_save(PAL_SETTINGS_PATH, settings)
     except Exception as e:
         rich.print(f"An error occurred during settings edit: {e}", file=sys.stderr)
         sys.exit(1)

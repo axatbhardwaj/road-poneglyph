@@ -1,0 +1,15 @@
+[Unit]
+Description=Pal Server
+After=network.target
+
+[Service]
+User=foo
+Group=foo
+Type=simple
+WorkingDirectory=/home/foo/.steam/steam/steamapps/common/PalServer
+ExecStart=/home/foo/.steam/steam/steamapps/common/PalServer/PalServer.sh -port=8211 -players=32 -useperfthreads -NoAsyncLoadingThread -UseMultithreadForDS
+Restart=always
+RestartSec=180
+
+[Install]
+WantedBy=multi-user.target 

@@ -351,7 +351,7 @@ def _arkmanager_save(path: Path, settings: dict[str, str]) -> None:
             out.append(f'{key}="{value}"\n')
         else:
             out.append(f"{key}={value}\n")
-    path.write_text("".join(out))
+    _write_via_sudo_tee(path, "".join(out))
 
 
 # --- ARK install scaffolding (ARK-11 + ARK-14..ARK-18) ----------------------

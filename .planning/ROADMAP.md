@@ -100,7 +100,12 @@
   7. `logpose ark stop` completes a clean save within arkmanager's default timeout; RCON is reachable on the configured `ark_RCONPort`.
   8. **Polkit/sudo posture — ARK is different from Palworld.** arkmanager uses `sudo -u steam`, not a systemd service owned by the installing user. So POL-05 (sudo-less service management) applies to Palworld only in v0.2.0; ARK uses one-time `sudo -u steam` invocations that the installing user authorises via passwordless NOPASSWD entry (`<user> ALL=(steam) NOPASSWD: /usr/local/bin/arkmanager *`). `logpose ark install` drops this sudoers fragment in `/etc/sudoers.d/logpose-ark`. Documented in README and Phase 6 migration note.
   9. **Auto-start at boot is opt-in.** A systemd unit `arkserver.service` (thin wrapper: `ExecStart=/usr/bin/sudo -u steam /usr/local/bin/arkmanager start`, `ExecStop=/usr/bin/sudo -u steam /usr/local/bin/arkmanager stop`, `Type=forking` since arkmanager backgrounds the server, `RemainAfterExit=yes`) is created but **not enabled by default**. `logpose ark install --enable-autostart` opts in.
-**Plans**: TBD
+**Plans**: 5 plans
+- [ ] 05-01-PLAN.md — Add arkmanager adapter (_arkmanager_parse/save) + arkserver.service.template + logpose-ark.sudoers.template + _install_ark helper wrapping install record §4.1-4.9 (no GAMES mutation; harness stays 4/4 green)
+- [ ] 05-02-PLAN.md — Insert GAMES["ark"] after palworld + factory branches for spec.key=="ark" verb dispatch (sudo -u steam arkmanager <verb>) + atomic re-capture of tests/golden/40-logpose.rules.v0_2_0 (harness stays 4/4 at commit boundary)
+- [ ] 05-03-PLAN.md — tests/test_ark_golden.py byte-diff harness for arkserver.service.template + logpose-ark.sudoers.template (brings total to 6 tests)
+- [ ] 05-04-PLAN.md — [HUMAN-NEEDED VM] Debian 13 (trixie) fresh-VM E2E: logpose ark install --start; verifies ARK-01..ARK-19, SET-02/04, POL-05 (ARK), E2E-04 (Debian 13 half)
+- [ ] 05-05-PLAN.md — [HUMAN-NEEDED VM] Debian 12 (bookworm) fresh-VM E2E: Palworld install (E2E-03, POL-05 Palworld) + ARK install (E2E-04 Debian 12 half) + merged-polkit cross-game co-existence; validates 05-RESEARCH Assumption A3
 **UI hint**: yes
 **Reference**: `docs/ark-install-reference.md` (working install record, 2026-04-12, Debian 13 trixie, preaquatica beta, arkmanager v1.6.68)
 
@@ -149,7 +154,7 @@ Phases execute strictly in order — each phase's behavior contract depends on t
 | 2. Parameterize Helpers (no GAMES dict yet) | 5/5 | ✅ Complete | 2026-04-12 |
 | 3. Introduce GameSpec + GAMES dict (Palworld only) | 0/0 | Not started | — |
 | 4. Typer Factory + Merged Polkit | 0/4 | Not started | — |
-| 5. Add ARK Entry + E2E | 0/0 | Not started | — |
+| 5. Add ARK Entry + E2E | 0/5 | Not started | — |
 | 6. Release Polish + PyPI | 0/0 | Not started | — |
 
 ## Coverage

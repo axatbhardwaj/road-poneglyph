@@ -63,7 +63,8 @@ logpose palworld install --port 8211 --players 16 --start
 ### ARK: Survival Evolved
 
 ```bash
-# Install with an admin password (required) and start the server
+# Install with the admin password you want to use (or omit --admin-password for a
+# hidden prompt) and start the server
 logpose ark install --map TheIsland --admin-password 'your-strong-password' --start
 ```
 

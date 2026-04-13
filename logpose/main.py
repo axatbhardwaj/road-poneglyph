@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from string import Formatter
-from typing import Callable, Optional
+from typing import Callable, Iterable, Optional
 import re
 
 import rich
@@ -211,12 +211,12 @@ def _write_service_file(service_file: Path, content: str) -> None:
     _run_command("sudo systemctl daemon-reload")
 
 
-def _setup_polkit(user: str) -> None:
+def _setup_polkit(user: str, specs: Iterable[GameSpec]) -> None:
     """Allow `user` to control every registered game service without sudo."""
     console.print("Setting up policy for non-sudo control of all registered games...")
     policy_file = Path("/etc/polkit-1/rules.d/40-logpose.rules")
     _run_command(f"sudo mkdir -p {policy_file.parent}")
-    units = ", ".join(f'"{spec.service_name}.service"' for spec in GAMES.values())
+    units = ", ".join(f'"{spec.service_name}.service"' for spec in specs)
     template = _get_template("40-logpose.rules.template")
     # Placeholder audit — fails fast if the template drifts
     placeholders = {f[1] for f in Formatter().parse(template) if f[1]}
@@ -427,7 +427,7 @@ def _build_game_app(spec: GameSpec) -> typer.Typer:
         _write_service_file(
             Path(f"/etc/systemd/system/{spec.service_name}.service"), service_content
         )
-        _setup_polkit(Path.home().name)
+        _setup_polkit(Path.home().name, GAMES.values())
 
         console.print("Installation complete!")
 

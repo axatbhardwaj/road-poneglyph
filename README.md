@@ -9,7 +9,7 @@ A multi-game dedicated server launcher for Linux. `logpose` installs, configures
 - **Package manager repair**: attempts to fix common `apt`/`dpkg` breakage before running steamcmd.
 - **Merged Polkit rule**: a single `/etc/polkit-1/rules.d/40-logpose.rules` authorises the invoking user to start/stop/restart every known game service unit without `sudo`.
 - **ARK sudoers fragment**: `/etc/sudoers.d/logpose-ark` lets the invoking user run `sudo -u steam /usr/local/bin/arkmanager *` with no password prompt.
-- **Opt-in autostart for ARK**: `arkserver.service` is installed but NOT enabled at boot by default — pass `--enable-autostart` to `logpose ark install` or run `logpose ark enable` later.
+- **Opt-in autostart for ARK**: `arkserver.service` is NOT installed by default. Pass `--enable-autostart` to `logpose ark install` to write and enable the systemd unit; without the flag, manage the server exclusively through `logpose ark start/stop/...` (which call `arkmanager` directly — no systemd unit needed).
 - **Interactive settings editor**: `edit-settings` parses the per-game config file (`PalWorldSettings.ini` for Palworld, `/etc/arkmanager/instances/main.cfg` for ARK) and lets you change values interactively.
 
 ## Prerequisites
@@ -122,7 +122,7 @@ Opens an interactive editor against `PalWorldSettings.ini`, preserving unknown k
 
 ## ARK Usage (`logpose ark <verb>`)
 
-The ARK integration is an `arkmanager` (`ark-server-tools`) wrapper. `logpose ark install` creates a dedicated `steam` system user, drops `/etc/sudoers.d/logpose-ark` to allow the invoking user to call `sudo -u steam /usr/local/bin/arkmanager *` without a password, and writes `/etc/arkmanager/instances/main.cfg`. An `arkserver.service` unit is written but intentionally left disabled at boot — opt in with `--enable-autostart` (at install time) or `logpose ark enable` (afterwards).
+The ARK integration is an `arkmanager` (`ark-server-tools`) wrapper. `logpose ark install` creates a dedicated `steam` system user, drops `/etc/sudoers.d/logpose-ark` to allow the invoking user to call `sudo -u steam /usr/local/bin/arkmanager *` without a password, and writes `/etc/arkmanager/instances/main.cfg`. An `arkserver.service` unit is written **only when `--enable-autostart` is passed at install time**; otherwise no systemd unit exists for ARK and day-to-day management goes through `arkmanager` directly via `logpose ark <verb>`.
 
 Valid maps (12 supported): TheIsland, TheCenter, ScorchedEarth_P, Aberration_P, Extinction, Ragnarok, Valguero_P, CrystalIsles, LostIsland, Fjordur, Genesis, Genesis2.
 

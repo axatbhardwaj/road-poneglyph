@@ -56,7 +56,7 @@ pipx install logpose-launcher
 ### Palworld
 
 ```bash
-# Install with defaults (port 8211, 32 players) and start immediately
+# Install at port 8211 with a 16-player cap and start immediately
 logpose palworld install --port 8211 --players 16 --start
 ```
 

@@ -283,6 +283,77 @@ def _palworld_save(path: Path, settings: dict[str, str]) -> None:
     console.print("Settings saved successfully.")
 
 
+# --- arkmanager adapter (ARK-08 + ARK-09 + SET-02) -------------------------
+# main.cfg is sourced bash, NOT INI. ConfigParser would mangle it (no [section]
+# headers, bash-style key="value" assignments). Regex line editor preserves
+# comments, blank lines, and unrelated keys in place.
+
+_ARKMANAGER_LINE_RE = re.compile(r'^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"?(.*?)"?\s*$')
+
+
+def _ark_should_quote(value: str) -> bool:
+    """Quote unless value is True/False/numeric — mirrors Palworld should_quote."""
+    if value.lower() in ("true", "false"):
+        return False
+    try:
+        float(value)
+        return False
+    except ValueError:
+        return True
+
+
+def _arkmanager_parse(path: Path) -> dict[str, str]:
+    """Parse arkmanager main.cfg (sourced bash key=\"value\"). Ignores comments + blanks."""
+    settings: dict[str, str] = {}
+    for line in path.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        m = _ARKMANAGER_LINE_RE.match(line)
+        if m:
+            settings[m.group(1)] = m.group(2)
+    return settings
+
+
+def _arkmanager_save(path: Path, settings: dict[str, str]) -> None:
+    """Rewrite main.cfg in place: preserve all lines; mutate matching key= lines.
+
+    ARK-09: original line order + comments + unrelated keys untouched.
+    New keys (not present in file) appended at end in insertion order.
+    """
+    lines = path.read_text().splitlines(keepends=True)
+    out: list[str] = []
+    seen: set[str] = set()
+    for line in lines:
+        if line.lstrip().startswith("#"):
+            out.append(line)
+            continue
+        m = _ARKMANAGER_LINE_RE.match(line)
+        if m and m.group(1) in settings:
+            key = m.group(1)
+            value = settings[key]
+            # Preserve quoting style of the original line when possible.
+            rhs = line.split("=", 1)[1] if "=" in line else ""
+            original_quoted = '"' in rhs
+            trailing_newline = "\n" if line.endswith("\n") else ""
+            if original_quoted or _ark_should_quote(value):
+                out.append(f'{key}="{value}"{trailing_newline}')
+            else:
+                out.append(f"{key}={value}{trailing_newline}")
+            seen.add(key)
+        else:
+            out.append(line)
+    # Append keys not present in original — install-time seed for fresh main.cfg.
+    for key, value in settings.items():
+        if key in seen:
+            continue
+        if _ark_should_quote(value):
+            out.append(f'{key}="{value}"\n')
+        else:
+            out.append(f"{key}={value}\n")
+    path.write_text("".join(out))
+
+
 def _create_settings_from_default(
     default_path: Path,
     dst_path: Path,

@@ -363,7 +363,7 @@ _ARK_INSTANCE_CFG = Path("/etc/arkmanager/instances/main.cfg")
 _ARK_GLOBAL_CFG = Path("/etc/arkmanager/arkmanager.cfg")
 _ARK_APT_PACKAGES = (
     "steamcmd libc6-i386 lib32gcc-s1 lib32stdc++6 curl bzip2 tar rsync sed "
-    "perl-modules lsof"
+    "perl-modules lsof polkitd"
 )
 
 
@@ -728,6 +728,7 @@ GAMES: dict[str, GameSpec] = {
         apt_packages=[
             "steamcmd", "libc6-i386", "lib32gcc-s1", "lib32stdc++6",
             "curl", "bzip2", "tar", "rsync", "sed", "perl-modules", "lsof",
+            "polkitd",
         ],
         steam_sdk_paths=[],  # ARK-12
         install_options={

@@ -118,7 +118,11 @@
   2. TestPyPI dry-run publish succeeds; `pip install -i https://test.pypi.org/simple/ logpose-launcher` in a throwaway venv installs, and `logpose --help` post-install shows both `palworld` and `ark` sub-commands.
   3. `logpose-launcher` v0.2.0 is published to production PyPI; `palworld-server-launcher` v0.1.19 remains frozen and untouched.
   4. `README.md` includes: new `logpose palworld ...` / `logpose ark ...` examples for every verb, migration note for existing v0.1.19 users (new install, not upgrade), per-game firewall port reference (8211/UDP for Palworld; 7777/UDP game + 7778/UDP raw socket + 27015/UDP query + 27020/TCP RCON for ARK), manual polkit cleanup instructions for the old `40-palserver.rules`, and — new for v0.2.0 — ARK's sudoers fragment at `/etc/sudoers.d/logpose-ark` and the opt-in `arkserver.service` systemd unit (disabled by default; enabled via `--enable-autostart` at install time).
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 06-01-PLAN.md — Bump pyproject.toml to 0.2.0 + clean local build + verify wheel METADATA (E2E-05)
+- [ ] 06-02-PLAN.md — Rewrite README for multi-game CLI: palworld+ark verb examples, migration note, firewall ports, manual 40-palserver.rules cleanup, sudoers fragment + opt-in arkserver.service mention (PKG-08, POL-04)
+- [ ] 06-03-PLAN.md — [HUMAN-NEEDED PyPI token] TestPyPI dry-run upload + throwaway-venv install verification (E2E-06)
+- [ ] 06-04-PLAN.md — [HUMAN-NEEDED PyPI token] Production PyPI publish of logpose-launcher 0.2.0; palworld-server-launcher v0.1.19 frozen (PKG-07)
 
 ## Dependencies
 
@@ -155,7 +159,7 @@ Phases execute strictly in order — each phase's behavior contract depends on t
 | 3. Introduce GameSpec + GAMES dict (Palworld only) | 0/0 | Not started | — |
 | 4. Typer Factory + Merged Polkit | 0/4 | Not started | — |
 | 5. Add ARK Entry + E2E | 0/5 | Not started | — |
-| 6. Release Polish + PyPI | 0/0 | Not started | — |
+| 6. Release Polish + PyPI | 0/4 | Not started | — |
 
 ## Coverage
 

@@ -1,0 +1,14 @@
+[Unit]
+Description=ARK: Survival Evolved Server (via arkmanager)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+RemainAfterExit=yes
+User=steam
+ExecStart=/usr/local/bin/arkmanager start
+ExecStop=/usr/local/bin/arkmanager stop
+
+[Install]
+WantedBy=multi-user.target

@@ -543,6 +543,67 @@ def _install_ark(
     _arkmanager_install_validate(branch)
 
 
+# --- ARK CLI-boundary validation helpers (ARK-06 + ARK-07 + ARK-04) --------
+_ARK_SUPPORTED_MAPS: tuple[str, ...] = (
+    "TheIsland",
+    "TheCenter",
+    "ScorchedEarth_P",
+    "Aberration_P",
+    "Extinction",
+    "Ragnarok",
+    "Valguero_P",
+    "CrystalIsles",
+    "LostIsland",
+    "Fjordur",
+    "Genesis",
+    "Genesis2",
+)
+_ARK_FORBIDDEN_SESSION_CHARS = ('"', "$", "`", "\\")
+
+
+def _validate_ark_map(value: str) -> str:
+    """Typer callback — rejects unsupported maps. ARK-06."""
+    if value not in _ARK_SUPPORTED_MAPS:
+        raise typer.BadParameter(
+            f"Invalid map '{value}'. Supported: {', '.join(_ARK_SUPPORTED_MAPS)}"
+        )
+    return value
+
+
+def _validate_ark_session_name(name: str) -> str:
+    """Typer callback — rejects unsafe chars; warns on >63 chars. ARK-04."""
+    for bad in _ARK_FORBIDDEN_SESSION_CHARS:
+        if bad in name:
+            raise typer.BadParameter(
+                f"Session name contains unsupported character {bad!r}. "
+                f"Avoid: {' '.join(_ARK_FORBIDDEN_SESSION_CHARS)}"
+            )
+    if len(name) > 63:
+        console.print(
+            f"[yellow]Warning: session name is {len(name)} chars (>63); some "
+            f"clients may truncate.[/yellow]"
+        )
+    return name
+
+
+def _probe_port_collision(ports: list[tuple[str, int]]) -> None:
+    """Raise typer.Exit(1) if any (proto, port) in the list is already in use. ARK-07."""
+    try:
+        result = subprocess.run(
+            ["ss", "-tuln"], capture_output=True, text=True, check=False
+        )
+    except FileNotFoundError:
+        console.print("[yellow]Warning: `ss` not available; skipping port probe.[/yellow]")
+        return
+    out = result.stdout
+    for proto, port in ports:
+        # "udp   UNCONN  0  0  0.0.0.0:7778 0.0.0.0:*" and IPv6 variants
+        pattern = rf"^{proto}\s+\S+\s+\S+\s+\S+\s+\S+:{port}\b"
+        if re.search(pattern, out, re.MULTILINE):
+            console.print(f"[red]Port {port}/{proto} is already in use.[/red]")
+            raise typer.Exit(code=1)
+
+
 def _create_settings_from_default(
     default_path: Path,
     dst_path: Path,
@@ -649,16 +710,45 @@ GAMES: dict[str, GameSpec] = {
         steam_sdk_paths=[(_PAL_STEAM_CLIENT_SO, _PAL_SDK64_DST)],
         install_options={"port_default": 8211, "players_default": 32},
     ),
+    "ark": GameSpec(
+        key="ark",
+        display_name="ARK: Survival Evolved",
+        app_id=376030,
+        server_dir=Path("/home/steam/ARK"),
+        binary_rel_path="ShooterGame/Binaries/Linux/ShooterGameServer",
+        settings_path=_ARK_INSTANCE_CFG,
+        default_settings_path=None,  # SET-04: install-time seed, no template
+        settings_section_rename=None,  # ARK-09: no header rewrite
+        service_name="arkserver",
+        service_template_name="arkserver.service.template",
+        settings_adapter=SettingsAdapter(
+            parse=_arkmanager_parse, save=_arkmanager_save
+        ),
+        post_install_hooks=[],  # ARK-12: arkmanager + apt steamcmd own SDK setup
+        apt_packages=[
+            "steamcmd", "libc6-i386", "lib32gcc-s1", "lib32stdc++6",
+            "curl", "bzip2", "tar", "rsync", "sed", "perl-modules", "lsof",
+        ],
+        steam_sdk_paths=[],  # ARK-12
+        install_options={
+            "port_default": 7778,
+            "players_default": 10,
+            "query_port_default": 27015,
+            "rcon_port_default": 27020,
+            "map_default": "TheIsland",
+            "session_name_default": "logpose-ark",
+            "branch_default": "preaquatica",
+            "supported_maps": _ARK_SUPPORTED_MAPS,
+        },
+    ),
 }
 
 
 def _build_game_app(spec: GameSpec) -> typer.Typer:
-    """Build a Typer sub-app that owns all nine verbs for a single GameSpec.
+    """Build a Typer sub-app that owns all verbs for a single GameSpec.
 
-    Factory pattern (04-RESEARCH Pitfall 1): `spec` is captured as a CLOSURE
-    variable; every inner @sub.command body references `spec.*` — never
-    `GAMES["palworld"]`, never hardcoded service names. This is what makes
-    the sub-apps safe to produce inside an `add_typer` loop over GAMES.
+    Per-game verb branching: ARK delegates start/stop/... to arkmanager, while
+    Palworld dispatches via systemctl. edit-settings is shared (adapter-driven).
     """
     sub = typer.Typer(
         help=f"Manage {spec.display_name} dedicated server.",
@@ -672,89 +762,282 @@ def _build_game_app(spec: GameSpec) -> typer.Typer:
             f"GameSpec for {spec.key!r} missing required install_options key: {e}"
         ) from e
 
-    @sub.command()
-    def install(
-        port: int = typer.Option(port_default, help="Port to run the server on."),
-        players: int = typer.Option(players_default, help="Maximum number of players."),
-        start: bool = typer.Option(
-            False, "--start", help="Start the server immediately after installation."
-        ),
-    ) -> None:
-        """Install the dedicated server and create a systemd service."""
-        if Path.home() == Path("/root"):
-            rich.print("This script should not be run as root. Exiting.", file=sys.stderr)
-            raise typer.Exit(code=1)
+    if spec.key == "ark":
+        # ---- ARK: arkmanager delegation (ARK-19) + install branch (ARK-05) ----
+        query_port_default = int(spec.install_options["query_port_default"])
+        rcon_port_default = int(spec.install_options["rcon_port_default"])
+        map_default = str(spec.install_options["map_default"])
+        session_name_default = str(spec.install_options["session_name_default"])
+        branch_default = str(spec.install_options["branch_default"])
 
-        _install_steamcmd()
-        _run_steamcmd_update(spec.server_dir, spec.app_id)
-        for hook in spec.post_install_hooks:
-            hook()
-        service_content = _render_service_file(
-            service_name=spec.service_name,
-            template_name=spec.service_template_name,
-            user=Path.home().name,
-            working_directory=spec.server_dir,
-            exec_start_path=spec.server_dir / spec.binary_rel_path,
-            port=port,
-            players=players,
-        )
-        _write_service_file(
-            Path(f"/etc/systemd/system/{spec.service_name}.service"), service_content
-        )
-        _setup_polkit(Path.home().name, GAMES.values())
+        @sub.command()
+        def install(
+            map: str = typer.Option(
+                map_default, callback=_validate_ark_map,
+                help="Map (one of the 12 supported).",
+            ),
+            port: int = typer.Option(
+                port_default, help="ark_Port raw socket (game port 7777 is implicit).",
+            ),
+            query_port: int = typer.Option(
+                query_port_default, "--query-port", help="ark_QueryPort.",
+            ),
+            rcon_port: int = typer.Option(
+                rcon_port_default, "--rcon-port", help="ark_RCONPort.",
+            ),
+            players: int = typer.Option(
+                players_default, help="ark_MaxPlayers (1-70).",
+            ),
+            session_name: str = typer.Option(
+                session_name_default, "--session-name",
+                callback=_validate_ark_session_name,
+                help="ark_SessionName.",
+            ),
+            admin_password: Optional[str] = typer.Option(
+                None, "--admin-password",
+                help="ark_ServerAdminPassword (prompted hidden if missing).",
+            ),
+            password: str = typer.Option(
+                "", help="Optional ark_ServerPassword (public if empty).",
+            ),
+            beta: str = typer.Option(
+                branch_default, help="Branch (set to empty string for stable).",
+            ),
+            generate_password: bool = typer.Option(
+                False, "--generate-password",
+                help="Generate admin password via secrets.token_urlsafe(16).",
+            ),
+            enable_autostart: bool = typer.Option(
+                False, "--enable-autostart",
+                help="Enable arkserver.service at boot.",
+            ),
+            start: bool = typer.Option(
+                False, "--start", help="Start the server after installation.",
+            ),
+        ) -> None:
+            """Install ARK via arkmanager (wraps docs/ark-install-reference.md §4)."""
+            if Path.home() == Path("/root"):
+                rich.print(
+                    "This script should not be run as root. Exiting.", file=sys.stderr,
+                )
+                raise typer.Exit(code=1)
 
-        console.print("Installation complete!")
+            # Port collision probe (ARK-07) — fail early before any apt action.
+            _probe_port_collision([
+                ("udp", 7777),       # implicit game port
+                ("udp", port),       # ark_Port raw socket
+                ("udp", query_port), # ark_QueryPort
+                ("tcp", rcon_port),  # ark_RCONPort
+            ])
 
-        if start:
-            console.print("Starting the server...")
-            _run_command(f"systemctl start {spec.service_name}")
-            console.print("Server started successfully!")
-        else:
-            console.print(
-                f"You can now start the server with: logpose {spec.key} start"
+            # Resolve admin_password: explicit value > generate > prompt.
+            if admin_password is None:
+                if generate_password:
+                    import secrets
+                    admin_password = secrets.token_urlsafe(16)
+                    console.print(
+                        f"[bold yellow]Generated admin password (printed "
+                        f"once):[/bold yellow] {admin_password}"
+                    )
+                else:
+                    admin_password = typer.prompt(
+                        "Admin password", hide_input=True,
+                        confirmation_prompt=False,
+                    )
+
+            main_cfg_values = {
+                "arkserverroot": str(spec.server_dir),
+                "serverMap": map,
+                "ark_SessionName": session_name,
+                "ark_Port": str(port),
+                "ark_QueryPort": str(query_port),
+                "ark_RCONEnabled": "True",
+                "ark_RCONPort": str(rcon_port),
+                "ark_ServerPassword": password,
+                "ark_ServerAdminPassword": admin_password,
+                "ark_MaxPlayers": str(players),
+            }
+            invoking_user = Path.home().name
+
+            _install_ark(
+                branch=beta,
+                main_cfg_values=main_cfg_values,
+                invoking_user=invoking_user,
             )
 
-        console.print(
-            f"To enable the server to start on boot, run: logpose {spec.key} enable"
-        )
+            # Polkit rule regeneration picks up arkserver.service automatically.
+            _setup_polkit(invoking_user, GAMES.values())
 
-    @sub.command()
-    def start() -> None:
-        """Start the dedicated server."""
-        _run_command(f"systemctl start {spec.service_name}")
+            if enable_autostart:
+                console.print("Enabling arkserver.service at boot...")
+                service_content = _render_service_file(
+                    service_name=spec.service_name,
+                    template_name=spec.service_template_name,
+                    user=invoking_user,
+                    working_directory=spec.server_dir,
+                    exec_start_path=spec.server_dir / spec.binary_rel_path,
+                    port=port,
+                    players=players,
+                )
+                _write_service_file(
+                    Path(f"/etc/systemd/system/{spec.service_name}.service"),
+                    service_content,
+                )
+                _run_command(f"sudo systemctl enable {spec.service_name}")
 
-    @sub.command()
-    def stop() -> None:
-        """Stop the dedicated server."""
-        _run_command(f"systemctl stop {spec.service_name}")
+            console.print("Installation complete!")
 
-    @sub.command()
-    def restart() -> None:
-        """Restart the dedicated server."""
-        _run_command(f"systemctl restart {spec.service_name}")
+            if start:
+                console.print("Starting the server...")
+                _run_command("sudo -u steam /usr/local/bin/arkmanager start")
+                console.print(
+                    "Server started. First map load takes 5-10 min — "
+                    "`logpose ark status` to monitor."
+                )
+            else:
+                console.print(
+                    "You can now start the server with: logpose ark start"
+                )
 
-    @sub.command()
-    def status() -> None:
-        """Check the status of the dedicated server."""
-        _run_command(f"systemctl status {spec.service_name}", check=False)
+        @sub.command()
+        def start() -> None:
+            """Start the ARK server via arkmanager."""
+            _run_command("sudo -u steam /usr/local/bin/arkmanager start")
 
-    @sub.command()
-    def enable() -> None:
-        """Enable the dedicated server to start on boot."""
-        _run_command(f"systemctl enable {spec.service_name}")
+        @sub.command()
+        def stop() -> None:
+            """Stop the ARK server via arkmanager (graceful save)."""
+            _run_command("sudo -u steam /usr/local/bin/arkmanager stop")
 
-    @sub.command()
-    def disable() -> None:
-        """Disable the dedicated server from starting on boot."""
-        _run_command(f"systemctl disable {spec.service_name}")
+        @sub.command()
+        def restart() -> None:
+            """Restart the ARK server via arkmanager."""
+            _run_command("sudo -u steam /usr/local/bin/arkmanager restart")
 
-    @sub.command()
-    def update() -> None:
-        """Update the dedicated server via steamcmd."""
-        console.print(f"Updating {spec.display_name} dedicated server...")
-        _run_steamcmd_update(spec.server_dir, spec.app_id)
-        console.print("Update complete! Restart the server for the changes to take effect.")
+        @sub.command()
+        def status() -> None:
+            """Status of the ARK server via arkmanager."""
+            _run_command(
+                "sudo -u steam /usr/local/bin/arkmanager status", check=False,
+            )
 
+        @sub.command()
+        def saveworld() -> None:
+            """Force a world save via arkmanager RCON."""
+            _run_command("sudo -u steam /usr/local/bin/arkmanager saveworld")
+
+        @sub.command()
+        def backup() -> None:
+            """Backup current save via arkmanager."""
+            _run_command("sudo -u steam /usr/local/bin/arkmanager backup")
+
+        @sub.command()
+        def update() -> None:
+            """Update ARK via arkmanager (runs twice — steamcmd self-update quirk)."""
+            branch = str(spec.install_options["branch_default"])
+            cmd = (
+                f"sudo -u steam /usr/local/bin/arkmanager update "
+                f"--validate --beta={branch}"
+            )
+            _run_command(cmd, check=False)  # self-update, exits 0 no payload
+            _run_command(cmd)                # actual update
+
+        @sub.command()
+        def enable() -> None:
+            """Enable arkserver.service at boot (requires --enable-autostart at install)."""
+            _run_command(f"sudo systemctl enable {spec.service_name}")
+
+        @sub.command()
+        def disable() -> None:
+            """Disable arkserver.service from starting at boot."""
+            _run_command(f"sudo systemctl disable {spec.service_name}")
+
+    else:
+        # ---- Palworld: existing Phase-4 body (unchanged — PAL-09 invariant) ----
+        @sub.command()
+        def install(
+            port: int = typer.Option(port_default, help="Port to run the server on."),
+            players: int = typer.Option(players_default, help="Maximum number of players."),
+            start: bool = typer.Option(
+                False, "--start", help="Start the server immediately after installation."
+            ),
+        ) -> None:
+            """Install the dedicated server and create a systemd service."""
+            if Path.home() == Path("/root"):
+                rich.print("This script should not be run as root. Exiting.", file=sys.stderr)
+                raise typer.Exit(code=1)
+
+            _install_steamcmd()
+            _run_steamcmd_update(spec.server_dir, spec.app_id)
+            for hook in spec.post_install_hooks:
+                hook()
+            service_content = _render_service_file(
+                service_name=spec.service_name,
+                template_name=spec.service_template_name,
+                user=Path.home().name,
+                working_directory=spec.server_dir,
+                exec_start_path=spec.server_dir / spec.binary_rel_path,
+                port=port,
+                players=players,
+            )
+            _write_service_file(
+                Path(f"/etc/systemd/system/{spec.service_name}.service"), service_content
+            )
+            _setup_polkit(Path.home().name, GAMES.values())
+
+            console.print("Installation complete!")
+
+            if start:
+                console.print("Starting the server...")
+                _run_command(f"systemctl start {spec.service_name}")
+                console.print("Server started successfully!")
+            else:
+                console.print(
+                    f"You can now start the server with: logpose {spec.key} start"
+                )
+
+            console.print(
+                f"To enable the server to start on boot, run: logpose {spec.key} enable"
+            )
+
+        @sub.command()
+        def start() -> None:
+            """Start the dedicated server."""
+            _run_command(f"systemctl start {spec.service_name}")
+
+        @sub.command()
+        def stop() -> None:
+            """Stop the dedicated server."""
+            _run_command(f"systemctl stop {spec.service_name}")
+
+        @sub.command()
+        def restart() -> None:
+            """Restart the dedicated server."""
+            _run_command(f"systemctl restart {spec.service_name}")
+
+        @sub.command()
+        def status() -> None:
+            """Check the status of the dedicated server."""
+            _run_command(f"systemctl status {spec.service_name}", check=False)
+
+        @sub.command()
+        def enable() -> None:
+            """Enable the dedicated server to start on boot."""
+            _run_command(f"systemctl enable {spec.service_name}")
+
+        @sub.command()
+        def disable() -> None:
+            """Disable the dedicated server from starting on boot."""
+            _run_command(f"systemctl disable {spec.service_name}")
+
+        @sub.command()
+        def update() -> None:
+            """Update the dedicated server via steamcmd."""
+            console.print(f"Updating {spec.display_name} dedicated server...")
+            _run_steamcmd_update(spec.server_dir, spec.app_id)
+            console.print("Update complete! Restart the server for the changes to take effect.")
+
+    # --- Shared: edit-settings (SettingsAdapter-driven — both games) ---------
     @sub.command(name="edit-settings")
     def edit_settings() -> None:
         """Edit the game's settings file interactively."""

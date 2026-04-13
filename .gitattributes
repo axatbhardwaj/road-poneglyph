@@ -1,2 +1,2 @@
-logpose/templates/*.template -text
+road_poneglyph/templates/*.template -text
 tests/golden/** -text

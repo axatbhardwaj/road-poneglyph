@@ -17,7 +17,7 @@ import typer
 from rich.console import Console
 
 app = typer.Typer(
-    help="logpose — multi-game dedicated server launcher.",
+    help="road-poneglyph — multi-game dedicated server launcher.",
     no_args_is_help=True,
 )
 console = Console()
@@ -228,15 +228,15 @@ def _write_service_file(service_file: Path, content: str) -> None:
 def _setup_polkit(user: str, specs: Iterable[GameSpec]) -> None:
     """Allow `user` to control every registered game service without sudo."""
     console.print("Setting up policy for non-sudo control of all registered games...")
-    policy_file = Path("/etc/polkit-1/rules.d/40-logpose.rules")
+    policy_file = Path("/etc/polkit-1/rules.d/40-road-poneglyph.rules")
     _run_command(f"sudo mkdir -p {policy_file.parent}")
     units = ", ".join(f'"{spec.service_name}.service"' for spec in specs)
-    template = _get_template("40-logpose.rules.template")
+    template = _get_template("40-road-poneglyph.rules.template")
     # Placeholder audit — fails fast if the template drifts
     placeholders = {f[1] for f in Formatter().parse(template) if f[1]}
     if placeholders != {"units", "user"}:
         raise RuntimeError(
-            f"40-logpose.rules.template placeholder drift: {placeholders}"
+            f"40-road-poneglyph.rules.template placeholder drift: {placeholders}"
         )
     policy_content = template.format(units=units, user=user)
     _write_via_sudo_tee(policy_file, policy_content)
@@ -462,12 +462,12 @@ def _arkmanager_install_validate(branch: str) -> None:
 
 
 def _install_sudoers_fragment(user: str) -> None:
-    """Install /etc/sudoers.d/logpose-ark with NOPASSWD for arkmanager. ARK-18.
+    """Install /etc/sudoers.d/road-poneglyph-ark with NOPASSWD for arkmanager. ARK-18.
 
     MUST validate via `visudo -c -f` before atomic install — a bad sudoers
     fragment locks out ALL sudo (Pitfall 2).
     """
-    template = _get_template("logpose-ark.sudoers.template")
+    template = _get_template("road-poneglyph-ark.sudoers.template")
     content = template.format(user=user)
     import tempfile
     with tempfile.NamedTemporaryFile("w", delete=False, suffix=".sudoers") as tf:
@@ -486,7 +486,7 @@ def _install_sudoers_fragment(user: str) -> None:
             raise typer.Exit(code=1)
         _run_command(
             f"sudo install -m 0440 -o root -g root {tmppath} "
-            f"/etc/sudoers.d/logpose-ark"
+            f"/etc/sudoers.d/road-poneglyph-ark"
         )
     finally:
         _run_command(f"rm -f {tmppath}", check=False)
@@ -737,7 +737,7 @@ GAMES: dict[str, GameSpec] = {
             "query_port_default": 27015,
             "rcon_port_default": 27020,
             "map_default": "TheIsland",
-            "session_name_default": "logpose-ark",
+            "session_name_default": "road-poneglyph-ark",
             "branch_default": "preaquatica",
             "supported_maps": _ARK_SUPPORTED_MAPS,
         },
@@ -893,11 +893,11 @@ def _build_game_app(spec: GameSpec) -> typer.Typer:
                 _run_command("sudo -u steam /usr/local/bin/arkmanager start")
                 console.print(
                     "Server started. First map load takes 5-10 min — "
-                    "`logpose ark status` to monitor."
+                    "`road-poneglyph ark status` to monitor."
                 )
             else:
                 console.print(
-                    "You can now start the server with: logpose ark start"
+                    "You can now start the server with: road-poneglyph ark start"
                 )
 
         @sub.command()
@@ -994,11 +994,11 @@ def _build_game_app(spec: GameSpec) -> typer.Typer:
                 console.print("Server started successfully!")
             else:
                 console.print(
-                    f"You can now start the server with: logpose {spec.key} start"
+                    f"You can now start the server with: road-poneglyph {spec.key} start"
                 )
 
             console.print(
-                f"To enable the server to start on boot, run: logpose {spec.key} enable"
+                f"To enable the server to start on boot, run: road-poneglyph {spec.key} enable"
             )
 
         @sub.command()
@@ -1074,10 +1074,10 @@ def _version_cb(value: Optional[bool]) -> None:
         import importlib.metadata
 
         try:
-            v = importlib.metadata.version("logpose-launcher")
+            v = importlib.metadata.version("road-poneglyph")
         except importlib.metadata.PackageNotFoundError:
             v = "unknown"
-        console.print(f"logpose {v}")
+        console.print(f"road-poneglyph {v}")
         raise typer.Exit()
 
 
@@ -1091,7 +1091,7 @@ def _root(
         help="Show version and exit.",
     ),
 ) -> None:
-    """logpose — multi-game dedicated server launcher."""
+    """road-poneglyph — multi-game dedicated server launcher."""
 
 
 for _key, _spec in GAMES.items():

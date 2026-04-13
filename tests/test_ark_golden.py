@@ -5,8 +5,8 @@ Invocation modes (both MUST exit 0 when the harness is green):
   python tests/test_ark_golden.py
 
 Locks the shape of:
-  - logpose/templates/arkserver.service.template (ARK-02; static — no placeholders)
-  - logpose/templates/logpose-ark.sudoers.template (ARK-18; one {user} placeholder)
+  - road_poneglyph/templates/arkserver.service.template (ARK-02; static — no placeholders)
+  - road_poneglyph/templates/road-poneglyph-ark.sudoers.template (ARK-18; one {user} placeholder)
 
 Companion to tests/test_palworld_golden.py. Keep side-effect-free.
 """
@@ -17,10 +17,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-ARKSERVER_TEMPLATE = ROOT / "logpose" / "templates" / "arkserver.service.template"
+ARKSERVER_TEMPLATE = ROOT / "road_poneglyph" / "templates" / "arkserver.service.template"
 ARKSERVER_GOLDEN = ROOT / "tests" / "golden" / "arkserver.service.v0_2_0"
-SUDOERS_TEMPLATE = ROOT / "logpose" / "templates" / "logpose-ark.sudoers.template"
-SUDOERS_GOLDEN = ROOT / "tests" / "golden" / "logpose-ark.sudoers.v0_2_0"
+SUDOERS_TEMPLATE = ROOT / "road_poneglyph" / "templates" / "road-poneglyph-ark.sudoers.template"
+SUDOERS_GOLDEN = ROOT / "tests" / "golden" / "road-poneglyph-ark.sudoers.v0_2_0"
 
 
 def test_arkserver_service_template_static() -> None:
@@ -29,24 +29,18 @@ def test_arkserver_service_template_static() -> None:
     expected = ARKSERVER_GOLDEN.read_bytes()
     assert rendered == expected, (
         f"arkserver.service.template drift vs v0.2.0 golden "
-        f"(current={len(rendered)} bytes, golden={len(expected)} bytes). "
-        f"If the template change was intentional, re-capture via: "
-        f"cp {ARKSERVER_TEMPLATE} {ARKSERVER_GOLDEN}"
+        f"(current={len(rendered)} bytes, golden={len(expected)} bytes)."
     )
 
 
-def test_logpose_ark_sudoers_template_renders_correctly() -> None:
-    """logpose-ark.sudoers.template rendered with user='foo' must match golden byte-for-byte."""
+def test_road_poneglyph_ark_sudoers_template_renders_correctly() -> None:
+    """road-poneglyph-ark.sudoers.template rendered with user='foo' must match golden byte-for-byte."""
     template = SUDOERS_TEMPLATE.read_text()
     rendered = template.format(user="foo").encode("utf-8")
     expected = SUDOERS_GOLDEN.read_bytes()
     assert rendered == expected, (
-        f"logpose-ark.sudoers.template render drift vs v0.2.0 golden "
-        f"(rendered={len(rendered)} bytes, golden={len(expected)} bytes). "
-        f"If the placeholder set or template shape changed intentionally, "
-        f"re-capture via: python -c \"from pathlib import Path; "
-        f"p = Path('{SUDOERS_TEMPLATE}').read_text(); "
-        f"Path('{SUDOERS_GOLDEN}').write_bytes(p.format(user='foo').encode('utf-8'))\""
+        f"road-poneglyph-ark.sudoers.template render drift vs v0.2.0 golden "
+        f"(rendered={len(rendered)} bytes, golden={len(expected)} bytes)."
     )
 
 
@@ -58,13 +52,13 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        test_logpose_ark_sudoers_template_renders_correctly()
+        test_road_poneglyph_ark_sudoers_template_renders_correctly()
     except AssertionError as exc:
         print(
-            f"FAIL: test_logpose_ark_sudoers_template_renders_correctly: {exc}",
+            f"FAIL: test_road_poneglyph_ark_sudoers_template_renders_correctly: {exc}",
             file=sys.stderr,
         )
         sys.exit(1)
 
-    print("OK: arkserver.service.template + logpose-ark.sudoers.template match v0.2.0 goldens")
+    print("OK: arkserver.service.template + road-poneglyph-ark.sudoers.template match v0.2.0 goldens")
     sys.exit(0)

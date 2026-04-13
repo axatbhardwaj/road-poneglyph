@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "logpose-launcher"
+name = "road-poneglyph"
 version = "0.2.0"
 authors = [
     { name = "axatbhardwaj", email = "axatbhardwaj@gmail.com" },
@@ -22,10 +22,10 @@ dependencies = [
 ]
 
 [project.scripts]
-logpose = "logpose.main:app"
+road-poneglyph = "road_poneglyph.main:app"
 
 [tool.setuptools]
-packages = ["logpose"]
+packages = ["road_poneglyph"]
 
 [tool.setuptools.package-data]
-"logpose" = ["templates/*"]
+"road_poneglyph" = ["templates/*"]

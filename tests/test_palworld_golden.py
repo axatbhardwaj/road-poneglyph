@@ -4,7 +4,7 @@ Invocation modes (both MUST exit 0 when the harness is green):
   pytest tests/test_palworld_golden.py -x
   python tests/test_palworld_golden.py
 
-Drops dependency on logpose.main on purpose in Task 3 — Phase 2 Plan 05 adds
+Drops dependency on road_poneglyph.main on purpose in Task 3 — Phase 2 Plan 05 adds
 a second test that exercises the real _render_service_file code path once
 Plan 03 extracts it. Keep this file minimal and side-effect-free.
 """
@@ -16,13 +16,13 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TEMPLATE = ROOT / "logpose" / "templates" / "palserver.service.template"
+TEMPLATE = ROOT / "road_poneglyph" / "templates" / "palserver.service.template"
 GOLDEN = ROOT / "tests" / "golden" / "palserver.service.v0_1_19"
 
-# Ensure `logpose` is importable whether this file is run via pytest or
+# Ensure `road_poneglyph` is importable whether this file is run via pytest or
 # `python tests/test_palworld_golden.py`. Pytest injects rootdir automatically;
 # script mode only adds the script's own directory to sys.path. Plan 05's new
-# test imports `logpose.main`, so the repo root must be on sys.path in both modes.
+# test imports `road_poneglyph.main`, so the repo root must be on sys.path in both modes.
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -36,7 +36,7 @@ FIXTURE = {
 
 
 def _render_from_template() -> bytes:
-    """Render by str.format on the on-disk template. No logpose import."""
+    """Render by str.format on the on-disk template. No road_poneglyph import."""
     return TEMPLATE.read_bytes().decode("utf-8").format(**FIXTURE).encode("utf-8")
 
 
@@ -76,13 +76,8 @@ def test_golden_matches_v0_1_19_tag() -> None:
 
 
 def test_render_service_file_byte_identical_to_golden() -> None:
-    """Real code path: _render_service_file must produce byte-identical output to the golden.
-
-    This is the Pitfall 4 defender — if the harness only tests template.format() directly,
-    a broken _render_service_file helper would sneak past unnoticed. This test imports the
-    real helper, calls it with the fixture, and enforces byte-equality against the golden.
-    """
-    from logpose.main import _render_service_file
+    """Real code path: _render_service_file must produce byte-identical output to the golden."""
+    from road_poneglyph.main import _render_service_file
 
     rendered_str = _render_service_file(
         service_name="palserver",
@@ -97,38 +92,25 @@ def test_render_service_file_byte_identical_to_golden() -> None:
     expected = GOLDEN.read_bytes()
     assert rendered_bytes == expected, (
         f"_render_service_file drift vs v0.1.19 golden "
-        f"(rendered={len(rendered_bytes)} bytes, golden={len(expected)} bytes). "
-        f"Helper body diverged from template.format path — inspect logpose/main.py "
-        f"_render_service_file and compare placeholder wiring against the template."
+        f"(rendered={len(rendered_bytes)} bytes, golden={len(expected)} bytes)."
     )
 
 
 def test_polkit_rule_byte_identical_to_v0_2_0_golden() -> None:
-    """Merged polkit rule render must match the committed golden byte-for-byte.
+    """Merged polkit rule render must match the committed golden byte-for-byte."""
+    from road_poneglyph.main import GAMES
 
-    Renders 40-logpose.rules.template with the real GAMES-driven units
-    substitution (Palworld-only in Phase 4; ARK slots in during Phase 5 —
-    that phase will re-capture the golden at the same time as it adds
-    GAMES['ark']). user='foo' matches the fixture used by the palserver
-    tests in this file.
-    """
-    from logpose.main import GAMES
-
-    template = (ROOT / "logpose" / "templates" / "40-logpose.rules.template").read_text()
+    template = (ROOT / "road_poneglyph" / "templates" / "40-road-poneglyph.rules.template").read_text()
     units = ", ".join(f'"{spec.service_name}.service"' for spec in GAMES.values())
     rendered = template.format(units=units, user="foo").encode("utf-8")
-    expected = (ROOT / "tests" / "golden" / "40-logpose.rules.v0_2_0").read_bytes()
+    expected = (ROOT / "tests" / "golden" / "40-road-poneglyph.rules.v0_2_0").read_bytes()
     assert rendered == expected, (
-        f"40-logpose.rules render drift vs v0.2.0 golden "
-        f"(rendered={len(rendered)} bytes, golden={len(expected)} bytes). "
-        f"If GAMES registry changed (e.g. Phase 5 added 'ark'), re-capture the golden "
-        f"and update this test's docstring."
+        f"40-road-poneglyph.rules render drift vs v0.2.0 golden "
+        f"(rendered={len(rendered)} bytes, golden={len(expected)} bytes)."
     )
 
 
 if __name__ == "__main__":
-    # Script-mode entrypoint (phase success criterion #3: "script exits 0").
-    # Runs both tests; the v0.1.19-tag test degrades to a skip-but-pass if git unavailable.
     try:
         test_palserver_service_byte_identical_to_v0_1_19()
     except AssertionError as exc:
@@ -136,7 +118,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        # In script mode, a pytest.skip call raises — catch it and treat as pass.
         import pytest as _pytest
 
         try:
@@ -144,7 +125,6 @@ if __name__ == "__main__":
         except _pytest.skip.Exception as skip_exc:
             print(f"SKIP: test_golden_matches_v0_1_19_tag: {skip_exc}", file=sys.stderr)
     except ImportError:
-        # pytest not importable in script mode — run the raw check and let it skip silently
         try:
             v019_bytes = subprocess.check_output(
                 [
@@ -154,11 +134,9 @@ if __name__ == "__main__":
                 ],
                 cwd=str(ROOT),
             )
-            assert v019_bytes == TEMPLATE.read_bytes(), (
-                "palserver.service.template drifted vs v0.1.19 tag"
-            )
+            assert v019_bytes == TEMPLATE.read_bytes()
         except (subprocess.CalledProcessError, FileNotFoundError):
-            pass  # git/tag unavailable — mirror the pytest skip behavior
+            pass
 
     try:
         test_render_service_file_byte_identical_to_golden()
@@ -166,7 +144,7 @@ if __name__ == "__main__":
         print(f"FAIL: test_render_service_file_byte_identical_to_golden: {exc}", file=sys.stderr)
         sys.exit(1)
     except ImportError as exc:
-        print(f"FAIL: cannot import _render_service_file (logpose.main broken): {exc}", file=sys.stderr)
+        print(f"FAIL: cannot import _render_service_file: {exc}", file=sys.stderr)
         sys.exit(1)
 
     try:
@@ -175,8 +153,8 @@ if __name__ == "__main__":
         print(f"FAIL: test_polkit_rule_byte_identical_to_v0_2_0_golden: {exc}", file=sys.stderr)
         sys.exit(1)
     except ImportError as exc:
-        print(f"FAIL: cannot import logpose.main (module broken): {exc}", file=sys.stderr)
+        print(f"FAIL: cannot import road_poneglyph.main: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    print("OK: palserver.service + 40-logpose.rules match v0.1.19/v0.2.0 goldens")
+    print("OK: palserver.service + 40-road-poneglyph.rules match goldens")
     sys.exit(0)

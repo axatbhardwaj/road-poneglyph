@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TEMPLATE = ROOT / "logpose" / "templates" / "palserver.service.template"
+TEMPLATE = ROOT / "road_poneglyph" / "templates" / "palserver.service.template"
 GOLDEN = ROOT / "tests" / "golden" / "palserver.service.v0_1_19"
 
 FIXTURE = {

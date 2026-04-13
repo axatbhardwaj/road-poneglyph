@@ -204,10 +204,24 @@ def _render_service_file(
     )
 
 
+def _write_via_sudo_tee(path: Path, content: str) -> None:
+    """Pipe `content` to `sudo tee {path}` via stdin (no shell interpolation)."""
+    console.print(f"Writing {path} via sudo tee...")
+    proc = subprocess.run(
+        ["sudo", "tee", str(path)],
+        input=content,
+        text=True,
+        capture_output=True,
+    )
+    if proc.returncode != 0:
+        rich.print(f"sudo tee failed: {proc.stderr}", file=sys.stderr)
+        raise typer.Exit(code=1)
+
+
 def _write_service_file(service_file: Path, content: str) -> None:
     """Write rendered service content to disk via sudo tee and reload systemd."""
     console.print("Creating Pal Server service...")
-    _run_command(f"echo '{content}' | sudo tee {service_file}")
+    _write_via_sudo_tee(service_file, content)
     _run_command("sudo systemctl daemon-reload")
 
 
@@ -225,7 +239,7 @@ def _setup_polkit(user: str, specs: Iterable[GameSpec]) -> None:
             f"40-logpose.rules.template placeholder drift: {placeholders}"
         )
     policy_content = template.format(units=units, user=user)
-    _run_command(f"echo '{policy_content}' | sudo tee {policy_file}")
+    _write_via_sudo_tee(policy_file, policy_content)
     _run_command("sudo systemctl restart polkit.service")
 
 

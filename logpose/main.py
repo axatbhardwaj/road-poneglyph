@@ -525,7 +525,7 @@ def _build_game_app(spec: GameSpec) -> typer.Typer:
     return sub
 
 
-def _version_cb(value: bool) -> None:
+def _version_cb(value: Optional[bool]) -> None:
     if value:
         import importlib.metadata
 
@@ -533,7 +533,7 @@ def _version_cb(value: bool) -> None:
             v = importlib.metadata.version("logpose-launcher")
         except importlib.metadata.PackageNotFoundError:
             v = "unknown"
-        typer.echo(f"logpose {v}")
+        console.print(f"logpose {v}")
         raise typer.Exit()
 
 

@@ -33,6 +33,7 @@ jobs:
       - name: Run byte-diff harness
         run: |
           python -m pip install --upgrade pytest
+          python -m pip install dist/*.whl
           python -m pytest tests/ -x
 
       - name: Upload dist artifacts

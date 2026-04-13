@@ -389,8 +389,13 @@ def _build_game_app(spec: GameSpec) -> typer.Typer:
         help=f"Manage {spec.display_name} dedicated server.",
         no_args_is_help=True,
     )
-    port_default = int(spec.install_options.get("port_default", 0))
-    players_default = int(spec.install_options.get("players_default", 0))
+    try:
+        port_default = int(spec.install_options["port_default"])
+        players_default = int(spec.install_options["players_default"])
+    except KeyError as e:
+        raise RuntimeError(
+            f"GameSpec for {spec.key!r} missing required install_options key: {e}"
+        ) from e
 
     @sub.command()
     def install(

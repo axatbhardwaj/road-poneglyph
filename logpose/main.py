@@ -290,11 +290,11 @@ def _create_settings_from_default(
 ) -> None:
     """Create a settings file from a default template, optionally renaming a section header."""
     if not default_path.exists():
-        console.print(
+        rich.print(
             f"Default configuration file not found at {default_path}",
             file=sys.stderr,
         )
-        console.print(
+        rich.print(
             "Cannot create a new settings file. Please run `install` first or run the server once.",
             file=sys.stderr,
         )

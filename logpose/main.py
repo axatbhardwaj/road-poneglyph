@@ -354,6 +354,195 @@ def _arkmanager_save(path: Path, settings: dict[str, str]) -> None:
     path.write_text("".join(out))
 
 
+# --- ARK install scaffolding (ARK-11 + ARK-14..ARK-18) ----------------------
+# Composes docs/ark-install-reference.md §4.1-4.9 as Python helpers. Does NOT
+# render arkserver.service (opt-in; see Plan 05-02) and does NOT start the
+# server (caller's --start flag).
+
+_ARK_INSTANCE_CFG = Path("/etc/arkmanager/instances/main.cfg")
+_ARK_GLOBAL_CFG = Path("/etc/arkmanager/arkmanager.cfg")
+_ARK_APT_PACKAGES = (
+    "steamcmd libc6-i386 lib32gcc-s1 lib32stdc++6 curl bzip2 tar rsync sed "
+    "perl-modules lsof"
+)
+
+
+def _get_os_version_codename() -> str:
+    """Reads VERSION_CODENAME= from /etc/os-release. Empty string on failure."""
+    try:
+        with open("/etc/os-release") as f:
+            for line in f:
+                if line.startswith("VERSION_CODENAME="):
+                    return line.strip().split("=", 1)[1].strip('"')
+    except FileNotFoundError:
+        pass
+    return ""
+
+
+def _enable_debian_contrib_nonfree(codename: str) -> None:
+    """Rewrite /etc/apt/sources.list to include contrib non-free (Debian only).
+
+    Install record §4.1: three sed commands targeting main, main-security,
+    main-updates. Idempotent — re-runs are no-ops because the replacement
+    pattern won't match after first run.
+    """
+    if not codename:
+        rich.print(
+            "Warning: VERSION_CODENAME unknown; skipping contrib/non-free enable.",
+            file=sys.stderr,
+        )
+        return
+    for suffix in ("", "-security", "-updates"):
+        _run_command(
+            f"sudo sed -i 's|{codename}{suffix} main non-free-firmware|"
+            f"{codename}{suffix} main contrib non-free non-free-firmware|' "
+            f"/etc/apt/sources.list",
+            check=False,
+        )
+    _run_command("sudo dpkg --add-architecture i386")
+    _run_command("sudo apt-get update")
+
+
+def _accept_steam_eula() -> None:
+    """Pre-accept Steam EULA via debconf — mandatory before apt install steamcmd.
+
+    Install record §4.2 (ARK-15). Must run before `apt-get install steamcmd`
+    otherwise apt blocks on a TUI dialog.
+    """
+    for pkg in ("steam", "steamcmd"):
+        _run_command(
+            f"echo '{pkg} steam/question select I AGREE' | sudo debconf-set-selections"
+        )
+        _run_command(
+            f"echo '{pkg} steam/license note' | sudo debconf-set-selections"
+        )
+
+
+def _ensure_steam_user() -> None:
+    """Create `steam` service user if absent. ARK-16 — install record §4.4.
+
+    arkmanager's install.sh does NOT create the user; it validates via
+    getent and exits non-zero if missing.
+    """
+    result = subprocess.run(
+        ["getent", "passwd", "steam"], capture_output=True, check=False
+    )
+    if result.returncode == 0:
+        console.print("steam user already exists; skipping useradd.")
+        return
+    _run_command("sudo useradd -m -s /bin/bash steam")
+
+
+def _install_arkmanager_if_absent() -> None:
+    """Install arkmanager via upstream netinstall.sh. ARK-14 — install record §4.5.
+
+    Idempotent — skips if /usr/local/bin/arkmanager already exists.
+    """
+    if Path("/usr/local/bin/arkmanager").exists():
+        console.print("arkmanager already installed; skipping netinstall.")
+        return
+    _run_command(
+        "curl -sL https://raw.githubusercontent.com/arkmanager/ark-server-tools/master/"
+        "netinstall.sh | sudo bash -s steam"
+    )
+
+
+def _arkmanager_install_validate(branch: str) -> None:
+    """Run arkmanager install --validate TWICE. ARK-17 — install record §4.9.
+
+    First call self-updates steamcmd and exits 0 with no payload (known quirk).
+    Second call downloads the actual server files.
+    """
+    cmd = (
+        f"sudo -u steam /usr/local/bin/arkmanager install "
+        f"--beta={branch} --validate"
+    )
+    _run_command(cmd, check=False)  # first call: self-update, exit 0, no payload
+    _run_command(cmd)                # second call: actual download
+
+
+def _install_sudoers_fragment(user: str) -> None:
+    """Install /etc/sudoers.d/logpose-ark with NOPASSWD for arkmanager. ARK-18.
+
+    MUST validate via `visudo -c -f` before atomic install — a bad sudoers
+    fragment locks out ALL sudo (Pitfall 2).
+    """
+    template = _get_template("logpose-ark.sudoers.template")
+    content = template.format(user=user)
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", delete=False, suffix=".sudoers") as tf:
+        tf.write(content)
+        tmppath = tf.name
+    try:
+        result = subprocess.run(
+            ["sudo", "visudo", "-c", "-f", tmppath],
+            capture_output=True, text=True, check=False,
+        )
+        if result.returncode != 0:
+            rich.print(
+                f"sudoers validation FAILED — refusing to install. stderr:\n{result.stderr}",
+                file=sys.stderr,
+            )
+            raise typer.Exit(code=1)
+        _run_command(
+            f"sudo install -m 0440 -o root -g root {tmppath} "
+            f"/etc/sudoers.d/logpose-ark"
+        )
+    finally:
+        _run_command(f"rm -f {tmppath}", check=False)
+
+
+def _seed_ark_main_cfg(values: dict[str, str]) -> None:
+    """Seed /etc/arkmanager/instances/main.cfg with the 10 install-flag keys. ARK-10.
+
+    Also edits /etc/arkmanager/arkmanager.cfg to point at system steamcmd
+    (install record §4.6). After write, tightens perms (Pitfall 5 — admin
+    password must not be world-readable).
+    """
+    _arkmanager_save(_ARK_INSTANCE_CFG, values)
+    _arkmanager_save(
+        _ARK_GLOBAL_CFG,
+        {"steamcmdroot": "/usr/games", "steamcmdexec": "steamcmd"},
+    )
+    _run_command(f"sudo chmod 0640 {_ARK_INSTANCE_CFG}")
+    _run_command(f"sudo chgrp steam {_ARK_INSTANCE_CFG}")
+
+
+def _install_ark(
+    *,
+    branch: str,
+    main_cfg_values: dict[str, str],
+    invoking_user: str,
+) -> None:
+    """Compose install record §4.1-4.9 as a single idempotent helper.
+
+    Does NOT render arkserver.service (opt-in — handled by caller via
+    --enable-autostart). Does NOT start the server (caller's --start flag).
+    Does NOT re-run polkit setup (caller does that after GAMES-aware
+    _setup_polkit invocation).
+    """
+    _repair_package_manager()
+    os_id = _get_os_id()
+    if os_id == "debian":
+        codename = _get_os_version_codename()
+        _enable_debian_contrib_nonfree(codename)
+    else:
+        # Ubuntu path — reuse the existing multiverse + i386 setup pattern.
+        _run_command("sudo add-apt-repository multiverse -y", check=False)
+        _run_command("sudo dpkg --add-architecture i386")
+        _run_command("sudo apt-get update")
+    _accept_steam_eula()
+    _run_command(
+        f"sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "
+        f"--no-install-recommends {_ARK_APT_PACKAGES}"
+    )
+    _ensure_steam_user()
+    _install_arkmanager_if_absent()
+    _seed_ark_main_cfg(main_cfg_values)
+    _install_sudoers_fragment(invoking_user)
+    _arkmanager_install_validate(branch)
+
+
 def _create_settings_from_default(
     default_path: Path,
     dst_path: Path,

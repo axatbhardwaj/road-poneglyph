@@ -220,9 +220,10 @@ def _setup_polkit(user: str) -> None:
     template = _get_template("40-logpose.rules.template")
     # Placeholder audit — fails fast if the template drifts
     placeholders = {f[1] for f in Formatter().parse(template) if f[1]}
-    assert placeholders == {"units", "user"}, (
-        f"40-logpose.rules.template placeholder drift: {placeholders}"
-    )
+    if placeholders != {"units", "user"}:
+        raise RuntimeError(
+            f"40-logpose.rules.template placeholder drift: {placeholders}"
+        )
     policy_content = template.format(units=units, user=user)
     _run_command(f"echo '{policy_content}' | sudo tee {policy_file}")
     _run_command("sudo systemctl restart polkit.service")

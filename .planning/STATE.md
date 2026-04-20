@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.3.0
 milestone_name: Satisfactory Support
 status: active
-last_updated: "2026-04-20T20:48:08Z"
+last_updated: "2026-04-20T21:06:51Z"
 progress:
   total_phases: 3
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 33
+  completed_phases: 2
+  total_plans: 6
+  completed_plans: 6
+  percent: 67
 ---
 
 # STATE: road-poneglyph v0.3.0
@@ -23,33 +23,33 @@ progress:
 **Core Value:** One CLI, many games, zero sudo prompts — operators type `road-poneglyph <game> <command>` and get a working, autostart-capable dedicated server on a fresh Debian/Ubuntu box.
 **Distribution name on PyPI:** `road-poneglyph`
 **Granularity:** coarse (3 phases)
-**Current Focus:** Phase 7 — Satisfactory GameSpec + Service Template
+**Current Focus:** Phase 8 — Settings Adapter + HTTPS API Client
 
 ## Current Position
 
-**Phase:** 7 — Satisfactory GameSpec + Service Template — COMPLETE
+**Phase:** 8 — Settings Adapter + HTTPS API Client — COMPLETE
 **Plan:** 3/3 complete
-**Status:** Phase 7 complete — ready for Phase 8
-**Progress:** [███░░░░░░░] 33%
+**Status:** Phase 8 complete — ready for Phase 9
+**Progress:** [██████░░░░] 67%
 
-**Next action:** `/gsd-plan-phase 8` or `/gsd-autonomous --from 8`
+**Next action:** `/gsd-plan-phase 9` or `/gsd-autonomous --from 9`
 
 ## Performance Metrics
 
 | Metric | Value |
 |--------|-------|
-| Phases planned | 1 / 3 |
-| Phases complete | 1 / 3 |
-| Plans complete | 3 |
-| Requirements shipped | 12 / 24 |
-| Byte-diff harness green | 8 tests passing (4 Palworld + 2 ARK + 2 Satisfactory) |
+| Phases planned | 2 / 3 |
+| Phases complete | 2 / 3 |
+| Plans complete | 6 |
+| Requirements shipped | 21 / 24 |
+| Byte-diff harness green | 19 tests passing (4 Palworld + 2 ARK + 2 Satisfactory golden + 5 INI + 6 API) |
 
 ## Phase Completion
 
 | Phase | Name | Status | Completed | Notes |
 |-------|------|--------|-----------|-------|
 | 7 | Satisfactory GameSpec + Service Template | Complete | 2026-04-20 | 3/3 plans, 8 tests green, 0 deviations |
-| 8 | Settings Adapter + HTTPS API Client | Pending | — | INI editor + pre-shutdown save + API verbs |
+| 8 | Settings Adapter + HTTPS API Client | Complete | 2026-04-20 | 3/3 plans, 19 tests green, 0 deviations |
 | 9 | Release Polish + v0.3.0 Publish | Pending | — | README, version bump, tag → PyPI |
 
 ## Accumulated Context
@@ -65,6 +65,10 @@ progress:
 - INI adapter via stdlib configparser (same approach as research concluded).
 - Config files only appear after first graceful stop (first-run quirk — document, don't work around).
 - Server must be "claimed" in-game before API works (human step, cannot be automated).
+- Section-qualified INI keys ([Section]/Key) to avoid collisions between Unreal Engine INI sections.
+- stdlib-only HTTPS client (urllib.request + ssl + json) — no new pip dependencies.
+- ExecStop uses curl (not Python) for pre-shutdown save — no road-poneglyph install dependency for service user.
+- Token path in systemd uses /home/{user}/... not ~ because systemd does not expand tilde.
 
 ### Prior Milestone (v0.2.0) — Shipped 2026-04-14
 
@@ -81,8 +85,8 @@ progress:
 ## Session Continuity
 
 **Last session:** 2026-04-20
-**Stopped at:** Completed Phase 7 (all 3 plans)
-**Resume instructions:** `/gsd-autonomous --from 8`
+**Stopped at:** Completed Phase 8 (all 3 plans — INI adapter, API client, ExecStop)
+**Resume instructions:** `/gsd-plan-phase 9` or `/gsd-autonomous --from 9`
 
 ---
 *State initialized: 2026-04-21*

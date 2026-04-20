@@ -8,7 +8,7 @@
 ## Phases
 
 - [x] **Phase 7: Satisfactory GameSpec + Service Template** — Add `GAMES["satisfactory"]` entry, `satisfactory.service.template` (Type=simple, KillSignal=SIGINT), install helper (SteamCMD anonymous, app 1690800), sysctl tuning, polkit + golden recapture
-- [ ] **Phase 8: Settings Adapter + HTTPS API Client** — INI-based SettingsAdapter for Unreal Engine config files, pre-shutdown save via HTTPS API, Bearer token auth, `save` verb, health check integration
+- [x] **Phase 8: Settings Adapter + HTTPS API Client** — INI-based SettingsAdapter for Unreal Engine config files, pre-shutdown save via HTTPS API, Bearer token auth, `save` verb, health check integration
 - [ ] **Phase 9: Release Polish + v0.3.0 Publish** — README Satisfactory section, firewall ports, first-run instructions, version bump, tag v0.3.0 → PyPI
 
 ## Phase Details
@@ -42,9 +42,9 @@ Plans:
   6. `road-poneglyph satisfactory status` includes API health check info when server is running and claimed.
 **Plans:** 3 plans
 Plans:
-- [ ] 08-01-PLAN.md — INI-based SettingsAdapter + edit-settings graceful missing-file handling
-- [ ] 08-02-PLAN.md — HTTPS API client + token caching + save verb + enhanced status
-- [ ] 08-03-PLAN.md — ExecStop pre-shutdown save wiring + golden recapture
+- [x] 08-01-PLAN.md — INI-based SettingsAdapter + edit-settings graceful missing-file handling
+- [x] 08-02-PLAN.md — HTTPS API client + token caching + save verb + enhanced status
+- [x] 08-03-PLAN.md — ExecStop pre-shutdown save wiring + golden recapture
 
 ### Phase 9: Release Polish + v0.3.0 Publish
 **Goal**: `road-poneglyph` v0.3.0 ships to PyPI with Satisfactory support, README covers all 3 games with examples, ports, and first-run guide.
@@ -58,9 +58,9 @@ Plans:
   5. `road-poneglyph satisfactory install --start` on Debian 13 completes E2E (VM-gated; may defer like Phase 5).
 **Plans:** 3 plans
 Plans:
-- [ ] 08-01-PLAN.md — INI-based SettingsAdapter + edit-settings graceful missing-file handling
-- [ ] 08-02-PLAN.md — HTTPS API client + token caching + save verb + enhanced status
-- [ ] 08-03-PLAN.md — ExecStop pre-shutdown save wiring + golden recapture
+- [x] 08-01-PLAN.md — INI-based SettingsAdapter + edit-settings graceful missing-file handling
+- [x] 08-02-PLAN.md — HTTPS API client + token caching + save verb + enhanced status
+- [x] 08-03-PLAN.md — ExecStop pre-shutdown save wiring + golden recapture
 
 ## Dependencies
 
@@ -83,7 +83,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|---------------|--------|-----------|
 | 7. Satisfactory GameSpec + Service | 3/3 | Complete | 2026-04-20 |
-| 8. Settings Adapter + API Client | 0/3 | In progress | — |
+| 8. Settings Adapter + API Client | 3/3 | Complete | 2026-04-20 |
 | 9. Release Polish + v0.3.0 Publish | 0/0 | Not started | — |
 
 ## Coverage

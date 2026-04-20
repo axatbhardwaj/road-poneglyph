@@ -9,38 +9,38 @@ Requirements for adding Satisfactory dedicated server support to road-poneglyph.
 
 ### Satisfactory Game Entry (SAT)
 
-- [ ] **SAT-01**: `GAMES["satisfactory"]` entry with app_id=1690800, service_name="satisfactory", binary=FactoryServer.sh, install via SteamCMD anonymous
-- [ ] **SAT-02**: `satisfactory.service.template` with Type=simple, KillSignal=SIGINT, TimeoutStopSec=120, User={user}, WorkingDirectory={server_dir}
-- [ ] **SAT-03**: Install helper wrapping SteamCMD install (anonymous login, app_update 1690800 validate) — same pattern as Palworld
-- [ ] **SAT-04**: Install uses invoking user's home (like Palworld) — server files at `~/SatisfactoryDedicatedServer/`
-- [ ] **SAT-05**: `road-poneglyph satisfactory install --port 7777 --reliable-port 8888 --players 4 --start` install command
-- [ ] **SAT-06**: Standard verbs: start, stop, restart, status, enable, disable, update — all dispatched through factory
-- [ ] **SAT-07**: `vm.max_map_count=262144` sysctl tuning via post_install_hook (prevents crash on large maps)
-- [ ] **SAT-08**: Optional `--auto-update` flag writes ExecStartPre steamcmd update in service template
+- [x] **SAT-01**: `GAMES["satisfactory"]` entry with app_id=1690800, service_name="satisfactory", binary=FactoryServer.sh, install via SteamCMD anonymous
+- [x] **SAT-02**: `satisfactory.service.template` with Type=simple, KillSignal=SIGINT, TimeoutStopSec=120, User={user}, WorkingDirectory={server_dir}
+- [x] **SAT-03**: Install helper wrapping SteamCMD install (anonymous login, app_update 1690800 validate) — same pattern as Palworld
+- [x] **SAT-04**: Install uses invoking user's home (like Palworld) — server files at `~/SatisfactoryDedicatedServer/`
+- [x] **SAT-05**: `road-poneglyph satisfactory install --port 7777 --reliable-port 8888 --players 4 --start` install command
+- [x] **SAT-06**: Standard verbs: start, stop, restart, status, enable, disable, update — all dispatched through factory
+- [x] **SAT-07**: `vm.max_map_count=262144` sysctl tuning via post_install_hook (prevents crash on large maps)
+- [x] **SAT-08**: Optional `--auto-update` flag writes ExecStartPre steamcmd update in service template
 
 ### Settings Adapter (SET)
 
-- [ ] **SET-05**: INI-based SettingsAdapter parsing Engine.ini, Game.ini, GameUserSettings.ini (Unreal Engine INI via configparser)
-- [ ] **SET-06**: `road-poneglyph satisfactory edit-settings` interactive editor (Rich-table UI, same UX as Palworld/ARK)
-- [ ] **SET-07**: Graceful handling of missing config files (first-run: configs only generated after first graceful stop)
+- [x] **SET-05**: INI-based SettingsAdapter parsing Engine.ini, Game.ini, GameUserSettings.ini (Unreal Engine INI via configparser)
+- [x] **SET-06**: `road-poneglyph satisfactory edit-settings` interactive editor (Rich-table UI, same UX as Palworld/ARK)
+- [x] **SET-07**: Graceful handling of missing config files (first-run: configs only generated after first graceful stop)
 
 ### HTTPS API Integration (API)
 
-- [ ] **API-01**: Pre-shutdown save: ExecStop calls `SaveGame` via HTTPS API before sending SIGINT
-- [ ] **API-02**: `road-poneglyph satisfactory save [name]` verb wrapping the SaveGame API endpoint
-- [ ] **API-03**: Health check integration (`HealthCheck` endpoint — no auth required) for enhanced status output
-- [ ] **API-04**: Bearer token auth flow: PasswordLogin → token; token cached at `~/.config/road-poneglyph/satisfactory-api-token`
-- [ ] **API-05**: Token file stored with mode 0600, not committed to git, documented in README
+- [x] **API-01**: Pre-shutdown save: ExecStop calls `SaveGame` via HTTPS API before sending SIGINT
+- [x] **API-02**: `road-poneglyph satisfactory save [name]` verb wrapping the SaveGame API endpoint
+- [x] **API-03**: Health check integration (`HealthCheck` endpoint — no auth required) for enhanced status output
+- [x] **API-04**: Bearer token auth flow: PasswordLogin → token; token cached at `~/.config/road-poneglyph/satisfactory-api-token`
+- [x] **API-05**: Token file stored with mode 0600, not committed to git, documented in README
 
 ### Polkit & Permissions (POL)
 
-- [ ] **POL-06**: Merged polkit rule (40-road-poneglyph.rules) includes `satisfactory.service` in units array
-- [ ] **POL-07**: Byte-diff golden recaptured atomically with GAMES["satisfactory"] insertion (same commit)
+- [x] **POL-06**: Merged polkit rule (40-road-poneglyph.rules) includes `satisfactory.service` in units array
+- [x] **POL-07**: Byte-diff golden recaptured atomically with GAMES["satisfactory"] insertion (same commit)
 
 ### Testing (TST)
 
-- [ ] **TST-01**: Byte-diff golden test for satisfactory.service.template
-- [ ] **TST-02**: Palworld + ARK goldens remain green after Satisfactory addition (regression invariant)
+- [x] **TST-01**: Byte-diff golden test for satisfactory.service.template
+- [x] **TST-02**: Palworld + ARK goldens remain green after Satisfactory addition (regression invariant)
 - [ ] **TST-03**: All tests pass in CI (GitHub Actions workflow, tag-triggered)
 
 ### Packaging & Release (PKG)
@@ -54,7 +54,7 @@ Requirements for adding Satisfactory dedicated server support to road-poneglyph.
 ### End-to-End (E2E)
 
 - [ ] **E2E-07**: `road-poneglyph satisfactory install --start` on Debian 13 (VM-gated)
-- [ ] **E2E-08**: `road-poneglyph satisfactory stop` triggers API save + SIGINT graceful shutdown
+- [x] **E2E-08**: `road-poneglyph satisfactory stop` triggers API save + SIGINT graceful shutdown
 
 ## Traceability
 

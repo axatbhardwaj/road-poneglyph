@@ -682,6 +682,7 @@ def _interactive_edit_loop(settings: dict[str, str]) -> None:
 _PAL_SERVER_DIR_LOCAL = STEAM_DIR / "steamapps/common/PalServer"
 _PAL_STEAM_CLIENT_SO = STEAM_DIR / "steamapps/common/Steamworks SDK Redist/linux64/steamclient.so"
 _PAL_SDK64_DST = Path.home() / ".steam/sdk64"
+_SAT_SERVER_DIR = Path.home() / "SatisfactoryDedicatedServer"
 
 
 def _palworld_sdk_hook() -> None:
@@ -794,6 +795,27 @@ GAMES: dict[str, GameSpec] = {
             "session_name_default": "road-poneglyph-ark",
             "branch_default": "preaquatica",
             "supported_maps": _ARK_SUPPORTED_MAPS,
+        },
+    ),
+    "satisfactory": GameSpec(
+        key="satisfactory",
+        display_name="Satisfactory",
+        app_id=1690800,
+        server_dir=_SAT_SERVER_DIR,
+        binary_rel_path="FactoryServer.sh",
+        settings_path=_SAT_SERVER_DIR / "FactoryGame/Saved/Config/LinuxServer/GameUserSettings.ini",
+        default_settings_path=None,  # Config only generated after first graceful stop
+        settings_section_rename=None,
+        service_name="satisfactory",
+        service_template_name="satisfactory.service.template",
+        settings_adapter=SettingsAdapter(parse=_palworld_parse, save=_palworld_save),  # Placeholder — Phase 8 replaces with INI adapter
+        post_install_hooks=[_satisfactory_sysctl_hook],
+        apt_packages=[],
+        steam_sdk_paths=[],
+        install_options={
+            "port_default": 7777,
+            "players_default": 4,
+            "reliable_port_default": 8888,
         },
     ),
 }
@@ -1006,6 +1028,106 @@ def _build_game_app(spec: GameSpec) -> typer.Typer:
         def disable() -> None:
             """Disable arkserver.service from starting at boot."""
             _run_command(f"sudo systemctl disable {spec.service_name}")
+
+    elif spec.key == "satisfactory":
+        # ---- Satisfactory: native SteamCMD + SIGINT systemd (SAT-01..SAT-08) ----
+        reliable_port_default = int(spec.install_options["reliable_port_default"])
+
+        @sub.command()
+        def install(
+            port: int = typer.Option(
+                port_default, help="Game port (UDP).",
+            ),
+            reliable_port: int = typer.Option(
+                reliable_port_default, "--reliable-port",
+                help="Reliable messaging port (TCP).",
+            ),
+            players: int = typer.Option(
+                players_default, help="Max players (set in Game.ini).",
+            ),
+            auto_update: bool = typer.Option(
+                False, "--auto-update",
+                help="Add ExecStartPre to auto-update via SteamCMD on each start (SAT-08).",
+            ),
+            start: bool = typer.Option(
+                False, "--start", help="Start the server after installation.",
+            ),
+        ) -> None:
+            """Install Satisfactory dedicated server (SteamCMD anonymous, app 1690800)."""
+            if Path.home() == Path("/root"):
+                rich.print(
+                    "This script should not be run as root. Exiting.", file=sys.stderr,
+                )
+                raise typer.Exit(code=1)
+
+            _install_satisfactory(server_dir=spec.server_dir, app_id=spec.app_id)
+            for hook in spec.post_install_hooks:
+                hook()
+            service_content = _render_satisfactory_service(
+                user=Path.home().name,
+                working_directory=spec.server_dir,
+                exec_start_path=spec.server_dir / spec.binary_rel_path,
+                port=port,
+                reliable_port=reliable_port,
+                auto_update=auto_update,
+            )
+            _write_service_file(
+                Path(f"/etc/systemd/system/{spec.service_name}.service"),
+                service_content,
+            )
+            _setup_polkit(Path.home().name, GAMES.values())
+
+            console.print("Installation complete!")
+
+            if start:
+                console.print("Starting the server...")
+                _run_command(f"systemctl start {spec.service_name}")
+                console.print("Server started successfully!")
+            else:
+                console.print(
+                    f"You can now start the server with: road-poneglyph {spec.key} start"
+                )
+
+            console.print(
+                f"To enable the server to start on boot, run: road-poneglyph {spec.key} enable"
+            )
+
+        @sub.command()
+        def start() -> None:
+            """Start the Satisfactory dedicated server."""
+            _run_command(f"systemctl start {spec.service_name}")
+
+        @sub.command()
+        def stop() -> None:
+            """Stop the Satisfactory dedicated server (SIGINT — graceful)."""
+            _run_command(f"systemctl stop {spec.service_name}")
+
+        @sub.command()
+        def restart() -> None:
+            """Restart the Satisfactory dedicated server."""
+            _run_command(f"systemctl restart {spec.service_name}")
+
+        @sub.command()
+        def status() -> None:
+            """Check the status of the Satisfactory dedicated server."""
+            _run_command(f"systemctl status {spec.service_name}", check=False)
+
+        @sub.command()
+        def enable() -> None:
+            """Enable the Satisfactory dedicated server to start on boot."""
+            _run_command(f"systemctl enable {spec.service_name}")
+
+        @sub.command()
+        def disable() -> None:
+            """Disable the Satisfactory dedicated server from starting on boot."""
+            _run_command(f"systemctl disable {spec.service_name}")
+
+        @sub.command()
+        def update() -> None:
+            """Update the Satisfactory dedicated server via SteamCMD."""
+            console.print(f"Updating {spec.display_name} dedicated server...")
+            _install_satisfactory(server_dir=spec.server_dir, app_id=spec.app_id)
+            console.print("Update complete! Restart the server for the changes to take effect.")
 
     else:
         # ---- Palworld: existing Phase-4 body (unchanged — PAL-09 invariant) ----

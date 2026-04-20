@@ -96,16 +96,16 @@ def test_render_service_file_byte_identical_to_golden() -> None:
     )
 
 
-def test_polkit_rule_byte_identical_to_v0_2_0_golden() -> None:
+def test_polkit_rule_byte_identical_to_v0_3_0_golden() -> None:
     """Merged polkit rule render must match the committed golden byte-for-byte."""
     from road_poneglyph.main import GAMES
 
     template = (ROOT / "road_poneglyph" / "templates" / "40-road-poneglyph.rules.template").read_text()
     units = ", ".join(f'"{spec.service_name}.service"' for spec in GAMES.values())
     rendered = template.format(units=units, user="foo").encode("utf-8")
-    expected = (ROOT / "tests" / "golden" / "40-road-poneglyph.rules.v0_2_0").read_bytes()
+    expected = (ROOT / "tests" / "golden" / "40-road-poneglyph.rules.v0_3_0").read_bytes()
     assert rendered == expected, (
-        f"40-road-poneglyph.rules render drift vs v0.2.0 golden "
+        f"40-road-poneglyph.rules render drift vs v0.3.0 golden "
         f"(rendered={len(rendered)} bytes, golden={len(expected)} bytes)."
     )
 
@@ -148,9 +148,9 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        test_polkit_rule_byte_identical_to_v0_2_0_golden()
+        test_polkit_rule_byte_identical_to_v0_3_0_golden()
     except AssertionError as exc:
-        print(f"FAIL: test_polkit_rule_byte_identical_to_v0_2_0_golden: {exc}", file=sys.stderr)
+        print(f"FAIL: test_polkit_rule_byte_identical_to_v0_3_0_golden: {exc}", file=sys.stderr)
         sys.exit(1)
     except ImportError as exc:
         print(f"FAIL: cannot import road_poneglyph.main: {exc}", file=sys.stderr)

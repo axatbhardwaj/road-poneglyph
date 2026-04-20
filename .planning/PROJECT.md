@@ -1,119 +1,85 @@
-# logpose
+# road-poneglyph
 
 ## What This Is
 
-`logpose` is a multi-game dedicated server launcher for Debian/Ubuntu — a single CLI that installs, configures, and manages game servers (Palworld, ARK: Survival Evolved) via SteamCMD + systemd + Polkit. It evolves in place from the existing `palworld-server-launcher` codebase, generalizing the Palworld-specific tool into a game-dispatched launcher without a full architectural rewrite.
+`road-poneglyph` is a multi-game dedicated server launcher for Debian/Ubuntu — a single CLI that installs, configures, and manages game servers (Palworld, ARK: Survival Evolved, Satisfactory) via SteamCMD + systemd + Polkit. It evolved from the `palworld-server-launcher` codebase, generalizing into a game-dispatched launcher.
 
 ## Core Value
 
-**One CLI, many games, zero sudo prompts** — operators type `logpose <game> <command>` and get a working, autostart-capable dedicated server on a fresh Debian/Ubuntu box. Adding a new game is a config entry, not a new tool.
+**One CLI, many games, zero sudo prompts** — operators type `road-poneglyph <game> <command>` and get a working, autostart-capable dedicated server on a fresh Debian/Ubuntu box. Adding a new game is a config entry, not a new tool.
 
 ## Requirements
 
 ### Validated
 
-<!-- Shipped and confirmed valuable in palworld-server-launcher v0.1.19 -->
+<!-- Shipped in road-poneglyph v0.2.0 -->
 
 - ✓ SteamCMD install automation on Debian/Ubuntu — existing (v0.1.19)
 - ✓ Aggressive apt/dpkg repair before install (`_repair_package_manager`) — existing (v0.1.19)
 - ✓ systemd service creation with user-scoped execution — existing (v0.1.19)
 - ✓ Polkit rule for sudo-less `systemctl start|stop|restart` — existing (v0.1.19)
-- ✓ SteamCMD license pre-acceptance via debconf-set-selections — existing (v0.1.19)
-- ✓ Palworld install, start, stop, restart, status, enable, disable, update — existing (v0.1.19)
-- ✓ Palworld `edit-settings` — custom `OptionSettings=(...)` regex parser + interactive editor — existing (v0.1.19)
-- ✓ Steam SDK fix (`steamclient.so` → `~/.steam/sdk64/`) — existing (v0.1.19)
-- ✓ Templates via `str.format()` with escaped JS braces in polkit rules — existing (v0.1.19)
+- ✓ Palworld install, start, stop, restart, status, enable, disable, update, edit-settings — v0.2.0
+- ✓ GameSpec frozen dataclass + GAMES registry — v0.2.0
+- ✓ Typer factory with game-first subcommands (`road-poneglyph <game> <verb>`) — v0.2.0
+- ✓ Merged polkit rule covering all registered games — v0.2.0
+- ✓ ARK via arkmanager wrapper (`road-poneglyph ark <verb>`) — v0.2.0
+- ✓ PyPI publish via GitHub Actions OIDC trusted publisher — v0.2.0
+- ✓ Byte-diff golden regression harness (6 tests) — v0.2.0
 
 ### Active
 
-<!-- Milestone v0.2.0 scope: rename + generalize + add ARK -->
+<!-- Milestone v0.3.0 scope: add Satisfactory -->
 
-- [ ] Rename package `palworld_server_launcher/` → `logpose/`; update `pyproject.toml` (`name = "logpose"`, entry point `logpose = "logpose.main:app"`)
-- [ ] Parameterize `main.py` via a `GAMES` dict keyed by game name — fields: `app_id`, `server_dir`, `settings_path`, `default_settings_path`, `service_name`, `service_template`, `launch_args_template`, `settings_adapter` (callable pair for parse/save)
-- [ ] Refactor existing helpers (`_run_command`, `_install_steamcmd`, `_repair_package_manager`, `_fix_steam_sdk`, `_create_service_file`, `_setup_polkit`) to accept a game key or read game-specific values from the `GAMES` dict — no `BaseGame` class, no `core/` module split
-- [ ] Convert Typer CLI to game-first nested subcommands: `logpose palworld install`, `logpose palworld start`, `logpose ark install`, `logpose ark start`, etc. Every existing command re-exposed per game.
-- [ ] Add ARK: Survival Evolved game entry — SteamCMD app id `376030`, binary `ShooterGame/Binaries/Linux/ShooterGameServer`, multi-port launch args (GamePort 7777 / QueryPort 27015 / RCON 27020 default), map selection (TheIsland default; Ragnarok, TheCenter, ScorchedEarth, Aberration, Extinction, Valguero, CrystalIsles, Fjordur, LostIsland, Genesis, Gen2 supported), session name + admin password on install
-- [ ] Add ARK settings adapter — standard-INI parser for `ShooterGame/Saved/Config/LinuxServer/GameUserSettings.ini` (configparser-based; preserves sections, comments where feasible) — works out-of-the-box with `logpose ark edit-settings`
-- [ ] Create `arkserver.service` systemd template with ARK launch command
-- [ ] Create per-game polkit rule covering both `palserver.service` and `arkserver.service` for the installing user
-- [ ] Preserve Palworld behavior identically — same service name `palserver.service`, same polkit rule filename (or merged file covering both games), same `OptionSettings` regex parser, same launch args, same settings format
-- [ ] Update `README.md` with new CLI examples for both games + migration note ("this is a new package; `palworld-server-launcher` v0.1.19 stays as-is on PyPI")
-- [ ] Publish `logpose-launcher` as a new PyPI package (the name `logpose` is taken; CLI + import name stay `logpose`) — old `palworld-server-launcher` stays frozen at v0.1.19
-- [ ] Install per-game apt dependencies for ARK (`lib32gcc-s1 libc6-i386 libncurses5 libncursesw5 libsdl2-2.0-0 lib32stdc++6` with `lib32gcc1` fallback) — not installed for Palworld
-- [ ] Generalize `_fix_steam_sdk()` for ARK — requires `steamclient.so` in both `~/.steam/sdk32/` AND `~/.steam/sdk64/` plus symlink into `Engine/Binaries/ThirdParty/SteamCMD/Linux`
-- [ ] ARK systemd unit must set `LimitNOFILE=100000`, `KillSignal=SIGINT`, `TimeoutStopSec=300` for clean save-on-shutdown (Palworld unit stays byte-identical to v0.1.19)
-- [ ] Add `from __future__ import annotations` to every Python module for Python 3.8 PEP-585 compat; pin `typer>=0.9,<0.21` and `rich>=13.0,<14` in `pyproject.toml` (Typer 0.21 dropped 3.8 support)
-- [ ] Remove tracked `palworld_server_launcher.egg-info/` from git and add `*.egg-info/`, `build/`, `dist/` to `.gitignore` — corrupts the `logpose-launcher` wheel build otherwise
+- [ ] Add Satisfactory dedicated server entry — SteamCMD app id 1690800, native binary FactoryServer.sh, Type=simple, KillSignal=SIGINT
+- [ ] Satisfactory systemd service template with SIGINT shutdown + TimeoutStopSec=120
+- [ ] INI-based SettingsAdapter for Unreal Engine INI (Engine.ini, Game.ini, GameUserSettings.ini)
+- [ ] Pre-shutdown save via HTTPS API (SaveGame call before SIGINT)
+- [ ] HTTPS API client for server management (health check, save, shutdown)
+- [ ] Merged polkit rule updated to cover satisfactory.service
+- [ ] Byte-diff golden tests for satisfactory.service.template
+- [ ] README updated with Satisfactory CLI examples + port reference (7777 UDP+TCP, 8888 TCP)
+- [ ] Publish road-poneglyph v0.3.0 to PyPI (tag-triggered)
 
 ### Out of Scope
 
-- **Arch Linux / pacman support** — Debian/Ubuntu only for this milestone; generalization to other distros deferred.
-- **ARK: Survival Ascended (ASA)** — ASA has no native Linux server (requires Proton/Wine); only ASE (app id 376030) is in scope.
-- **`BaseGame` abstract class and `core/` module split** — explicitly rejected for minimum-diff approach; deferred until 3+ games justify the abstraction.
-- **Migration command for existing `palworld-server-launcher` users** — existing users keep running v0.1.19; `logpose` is a new install, not an upgrade path. Documented in README, not automated.
-- **CLI renamed to `gsl` per original future-direction note** — name is `logpose` (One Piece-inspired) instead.
-- **Additional games (Valheim, CS2, Satisfactory, etc.)** — only Palworld + ARK in v0.2.0; further games are future milestones.
-- **Test framework** — no pytest harness in v0.2.0; deferred to a later milestone.
-- **`Game.ini` editing for ARK** — only `GameUserSettings.ini` is editable via `edit-settings` in v0.2.0. `Game.ini` tuning (engrams, spawn rates) is manual.
-- **Migration of existing `palserver.service` installs** — installs from `palworld-server-launcher` v0.1.19 keep running; `logpose` creates its own service file with the same name but operators should re-run `logpose palworld install` to regenerate.
+- **Arch Linux / pacman support** — Debian/Ubuntu only.
+- **ARK: Survival Ascended (ASA)** — no native Linux server.
+- **Satisfactory mods management** — too complex for v0.3.0; manual via ficsit-cli.
+- **Satisfactory auto-claim** — server must be claimed in-game by first player (human step, cannot be automated).
+- **Custom HTTPS certificates for Satisfactory API** — self-signed works; custom certs deferred.
+- **Multi-instance Satisfactory** — single instance per box for v0.3.0.
 
 ## Context
 
-- Existing codebase is a single-file Python package (`palworld_server_launcher/main.py`, ~400 lines) + two templates (`palserver.service.template`, `palserver.rules.template`).
-- Heavy reliance on `subprocess.Popen` via a single `_run_command()` helper — never raw subprocess outside it.
-- Rich + Typer stack; Python 3.8+ per `requires-python`.
-- Template placeholders use Python `str.format()` — literal braces in polkit JS must be escaped as `{{ }}`.
-- Palworld settings file is **not** standard INI: values live inside `OptionSettings=(Key=Value,Key=Value,...)`, parsed via `re.findall(r'(\w+)=(".*?"|[^,]+)', ...)`.
-- ARK settings are standard INI split across `GameUserSettings.ini` and `Game.ini` — the two games need different settings adapters.
-- ARK needs more install-time parameters than Palworld (map, query port, RCON port, session name, admin password).
-- GCP VMs and fresh Debian installs frequently have broken dpkg state — `_repair_package_manager()` is load-bearing and must not be removed.
-- Service management via systemd; passwordless `systemctl start|stop|restart` via Polkit rule per installing user.
-- Current release: `palworld-server-launcher` v0.1.19 on PyPI (frozen); `logpose` will be a new package.
+- Single-file Python package (`road_poneglyph/main.py`, ~1100 lines) + templates.
+- Satisfactory uses same SteamCMD + systemd pattern as Palworld (native path, no wrapper).
+- Key difference: SIGINT shutdown (SIGTERM kills immediately), no auto-save on stop, HTTPS REST API instead of RCON.
+- Config files only generated after first graceful shutdown (first-run quirk).
+- GameSpec schema already supports this pattern — `post_install_hooks` can handle sysctl tuning.
 
 ## Constraints
 
-- **Tech stack**: Python 3.8+, Typer, Rich — no new runtime dependencies unless strongly justified. Python's stdlib `configparser` is sufficient for ARK's standard INI.
-- **OS**: Debian/Ubuntu only (`apt` + `dpkg`). No Arch/pacman, no RPM, no macOS, no Windows.
-- **Minimum diff**: No `BaseGame` class, no `core/` module split. A `GAMES` dict and per-game helper functions are the expected shape. Three similar lines > premature abstraction.
-- **Behavioral compatibility**: Palworld must behave identically to v0.1.19 — same service name, same polkit rule semantics, same launch args, same INI parsing. Anyone re-running `logpose palworld install` on an existing box should see no surprises.
-- **Template placeholder escaping**: `{user}`, `{port}`, `{players}`, `{exec_start_path}`, `{working_directory}` for Palworld; ARK needs extras like `{query_port}`, `{rcon_port}`, `{map}`, `{session_name}`, `{admin_password}`. Literal braces in JS (polkit) stay as `{{ }}`.
-- **SteamCMD app ids**: Palworld `2394010`, ARK: Survival Evolved `376030`.
-- **Keep `_repair_package_manager()` intact** — documented as load-bearing in CLAUDE.md.
-- **New PyPI package**: distribution name `logpose-launcher` (the unqualified `logpose` is taken on PyPI per research 2026-04-12). CLI entry point + Python import name remain `logpose`.
-- **Python 3.8 floor retained** via pinned deps (`typer>=0.9,<0.21`, `rich>=13.0,<14`); no runtime deps added.
-- **Per-game apt deps**: ARK requires `lib32gcc-s1 libc6-i386 libncurses5 libncursesw5 libsdl2-2.0-0 lib32stdc++6` (with `lib32gcc1` fallback for older Ubuntu). Must be gated by game, not installed for Palworld.
-- **`configparser` constructor for ARK INI**: `RawConfigParser(strict=False, interpolation=None, allow_no_value=True, delimiters=("=",), comment_prefixes=(";","#"))` + `cp.optionxform = str`. Defaults corrupt ARK keys silently.
+- **Tech stack**: Python 3.8+, Typer, Rich — no new runtime dependencies. stdlib `configparser` for Unreal INI.
+- **OS**: Debian/Ubuntu only.
+- **Behavioral compatibility**: Palworld + ARK must remain byte-identical after Satisfactory is added.
+- **SIGINT shutdown**: Satisfactory service MUST use `KillSignal=SIGINT` (SIGTERM kills without cleanup).
+- **Pre-shutdown save**: ExecStop or pre-stop hook must call API `SaveGame` before stop signal.
+- **Minimum RAM**: Document 12-16 GB requirement in README for Satisfactory.
+- **Port simplicity**: Only 7777 (UDP game + TCP API) and 8888 (TCP reliable messaging).
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| In-place rename (not new repo) | User explicitly wants "use this project, don't modify too much" — minimum diff, one repo, git-rename preserves history. | — Pending |
-| `GAMES` dict over `BaseGame` class | Only 2 games — abstraction cost exceeds benefit. Three similar lines > premature abstraction (per user CLAUDE.md). | — Pending |
-| Game-first nested subcommands (`logpose <game> <command>`) | Matches future `gsl`-style vision (One Piece metaphor aside) and scales cleanly when a 3rd game is added. Closer to `kubectl <resource> <verb>` ergonomics than a `--game` flag. | — Pending |
-| Publish new PyPI package (leave old frozen) | PyPI doesn't support package renames; cleanest is new name + deprecation note on old. No back-compat shims. User accepted explicitly. | — Pending |
-| Distribution name = `logpose-launcher` | `logpose` is taken on PyPI (abandoned ML lib). CLI/import stays `logpose`; only the pip install name differs. Verified via PyPI simple index 2026-04-12. | — Pending |
-| Name = `logpose` (One Piece) | Short (7 chars), typeable, metaphorically clean (navigational pointer to target), user-chosen. | ✓ Good |
-| Debian/Ubuntu only | Existing `_repair_package_manager()` is apt/dpkg-specific; Arch/pacman deferred. User explicitly scoped out. | — Pending |
-| ARK-ASE only (not ASA) | ASA has no native Linux server (Proton/Wine required). ASE has native Linux binary via app id 376030. | — Pending |
-| ARK INI adapter via stdlib `configparser` | Standard INI — no new dependency needed. | — Pending |
+| Renamed to road-poneglyph (One Piece) | `logpose` taken on PyPI; road-poneglyph (ancient stones pointing to treasure) reflects multi-game navigation | ✓ Done (v0.2.0) |
+| Native SteamCMD path for Satisfactory | Same pattern as Palworld — simpler, no wrapper tool needed. LinuxGSM exists but wrapping is unnecessary complexity. | — Pending |
+| HTTPS API for save management | Satisfactory has no RCON; HTTPS API on port 7777 is the only management interface. Minimal client needed. | — Pending |
+| Pre-stop save via ExecStop or hook | Server doesn't auto-save on any signal. Must explicitly save before SIGINT. | — Pending |
+| stdlib configparser for INI | Unreal Engine INI is standard enough for configparser; same conclusion as research for settings editing. | — Pending |
 
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
 
-**After each phase transition** (via `/gsd-transition`):
-1. Requirements invalidated? → Move to Out of Scope with reason
-2. Requirements validated? → Move to Validated with phase reference
-3. New requirements emerged? → Add to Active
-4. Decisions to log? → Add to Key Decisions
-5. "What This Is" still accurate? → Update if drifted
-
-**After each milestone** (via `/gsd-complete-milestone`):
-1. Full review of all sections
-2. Core Value check — still the right priority?
-3. Audit Out of Scope — reasons still valid?
-4. Update Context with current state
-
 ---
-*Last updated: 2026-04-12 after initialization*
+*Last updated: 2026-04-21 — new milestone v0.3.0 (Satisfactory)*

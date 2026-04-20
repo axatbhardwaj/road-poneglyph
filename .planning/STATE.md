@@ -1,124 +1,87 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.2.0
-milestone_name: milestone
-status: paused
-last_updated: "2026-04-13T17:32:43.556Z"
+milestone: v0.3.0
+milestone_name: Satisfactory Support
+status: active
+last_updated: "2026-04-21T00:00:00Z"
 progress:
-  total_phases: 6
-  completed_phases: 3
-  total_plans: 21
-  completed_plans: 22
-  percent: 100
+  total_phases: 3
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
-# STATE: logpose v0.2.0
+# STATE: road-poneglyph v0.3.0
 
 *Project memory — updated at phase transitions and session boundaries.*
 
 ## Project Reference
 
-**Project:** logpose (multi-game dedicated server launcher CLI; evolves from `palworld-server-launcher` v0.1.19 in place)
-**Active Milestone:** v0.2.0 — logpose rewrite (rename + generalize + add ARK: Survival Evolved)
-**Core Value:** One CLI, many games, zero sudo prompts — operators type `logpose <game> <command>` and get a working, autostart-capable dedicated server on a fresh Debian/Ubuntu box.
-**Distribution name on PyPI:** `logpose-launcher` (CLI + import name stay `logpose`).
-**Granularity:** coarse (6 phases)
-**Current Focus:** Phase 3 — Introduce GameSpec + GAMES dict (Palworld only)
+**Project:** road-poneglyph (multi-game dedicated server launcher CLI)
+**Active Milestone:** v0.3.0 — Add Satisfactory dedicated server support
+**Core Value:** One CLI, many games, zero sudo prompts — operators type `road-poneglyph <game> <command>` and get a working, autostart-capable dedicated server on a fresh Debian/Ubuntu box.
+**Distribution name on PyPI:** `road-poneglyph`
+**Granularity:** coarse (3 phases)
+**Current Focus:** Phase 7 — Satisfactory GameSpec + Service Template
 
 ## Current Position
 
-Phase: 2 (Parameterize Helpers (no GAMES dict yet)) — ✅ COMPLETE (verifier: human_needed, user deferred VM E2E to Phase 5)
-Plan: 5 of 5 complete
-**Phase:** 3 — Introduce GameSpec + GAMES dict (Palworld only) — NOT STARTED
+**Phase:** 7 — Satisfactory GameSpec + Service Template — NOT STARTED
 **Plan:** TBD
-**Status:** Paused — project synced to remote for resumption on server
-**Progress:** [██████████] 100%
+**Status:** Active — ready for `/gsd-plan-phase 7` or `/gsd-autonomous --from 7`
+**Progress:** [░░░░░░░░░░] 0%
 
-**Next action:** `/gsd-autonomous --from 3` to resume from Phase 3 on the server.
+**Next action:** `/gsd-autonomous --from 7` to execute all phases.
 
 ## Performance Metrics
 
 | Metric | Value |
 |--------|-------|
-| Phases planned | 2 / 6 |
-| Phases complete | 2 / 6 |
-| Plans complete | 5 |
-| Requirements shipped | 12 / 56 (PKG-01..PKG-06, ARCH-04 partial, PAL-03, PAL-04, PAL-09, SET-01, E2E-01) |
-| Byte-diff harness green | ✅ 3 tests passing (`pytest tests/test_palworld_golden.py -x`) |
-
-## Quick Tasks Completed
-
-| Date | Task | Outcome |
-|------|------|---------|
-| _(none yet)_ | | |
+| Phases planned | 0 / 3 |
+| Phases complete | 0 / 3 |
+| Plans complete | 0 |
+| Requirements shipped | 0 / 24 |
+| Byte-diff harness green | ✅ 6 tests passing (4 Palworld + 2 ARK) |
 
 ## Phase Completion
 
 | Phase | Name | Status | Completed | Notes |
 |-------|------|--------|-----------|-------|
-| 1 | Rename + Hygiene | ✅ Complete | 2026-04-12 | 4 atomic commits (7257387, 10add52, 643e1c6, a6c2b3c). Palworld behavior byte-identical per invariant check. |
-| 2 | Parameterize Helpers (no GAMES dict yet) | ✅ Complete | 2026-04-12 | 5 plans, 19 atomic commits. Byte-diff harness green (3 tests). VM E2E deferred to Phase 5 per user. Code review: clean. |
-| 3 | Introduce GameSpec + GAMES dict (Palworld only) | Pending | — | Dissolves `PAL_*` module globals into `GAMES["palworld"]`. |
-| 4 | Typer Factory + Merged Polkit | Pending | — | Game-first CLI + merged `40-logpose.rules`. Low-priority research flag. |
-| 5 | Add ARK Entry + E2E | Pending | — | **HIGH research priority** — six of ten top risks concentrate here. |
-| 6 | Release Polish + PyPI | Pending | — | `logpose-launcher` v0.2.0 to PyPI; v0.1.19 left frozen. |
+| 7 | Satisfactory GameSpec + Service Template | Pending | — | SteamCMD native path + SIGINT systemd template |
+| 8 | Settings Adapter + HTTPS API Client | Pending | — | INI editor + pre-shutdown save + API verbs |
+| 9 | Release Polish + v0.3.0 Publish | Pending | — | README, version bump, tag → PyPI |
 
 ## Accumulated Context
 
-### Decisions Locked (from PROJECT.md + research/SUMMARY.md)
+### Decisions Locked
 
-- In-place rename (not new repo) — minimum diff, git-rename preserves history.
-- `GameSpec` frozen dataclass + `GAMES: dict[str, GameSpec]` registry — no `BaseGame`, no `core/` split.
-- `SettingsAdapter` dataclass with `parse` + `save` callables per game.
-- Typer factory `_build_game_app(spec) -> typer.Typer` + `add_typer` loop (factory pattern is mandatory — naked decorator-in-loop misbinds).
-- Game-first nested CLI: `logpose <game> <verb>`.
-- PyPI distribution name: `logpose-launcher` (unqualified `logpose` is taken). CLI entry point + Python import name stay `logpose`.
-- Python 3.8+ floor retained via pinned deps: `typer>=0.9,<0.21`, `rich>=13.0,<14`.
-- ARK: Survival Evolved only (app id `376030`); ASA out of scope.
-- ARK RCON default port: `27020` (PROJECT.md originally had `32330` — corrected).
-- ARK SessionName written to `[SessionSettings]` only, never to launch args.
-- `_repair_package_manager()` stays load-bearing and untouched.
+- Native SteamCMD path (no wrapper tool like arkmanager) — same as Palworld pattern.
+- KillSignal=SIGINT for satisfactory.service (SIGTERM kills without cleanup).
+- Pre-shutdown save via HTTPS API `SaveGame` call (server does NOT auto-save on any signal).
+- Bearer token auth cached at `~/.config/road-poneglyph/satisfactory-api-token` (mode 0600).
+- `vm.max_map_count=262144` sysctl tuning via post_install_hook.
+- Ports: 7777 UDP (game) + 7777 TCP (API) + 8888 TCP (reliable messaging).
+- INI adapter via stdlib configparser (same approach as research concluded).
+- Config files only appear after first graceful stop (first-run quirk — document, don't work around).
+- Server must be "claimed" in-game before API works (human step, cannot be automated).
 
-### Todos Emitted
+### Prior Milestone (v0.2.0) — Shipped 2026-04-14
 
-*(none yet — populated at phase-transition boundaries)*
+- Palworld + ARK both working
+- GameSpec registry + Typer factory + merged polkit
+- PyPI trusted publisher workflow
+- Renamed to road-poneglyph
+- 6-test byte-diff harness green
 
-### Blockers
+### Research Available
 
-*(none)*
-
-### Known Open Questions
-
-These are the two open items from `research/SUMMARY.md`. Both have recommended defaults — `/gsd-autonomous` will proceed with the defaults unless the user overrides.
-
-1. **Python 3.8 floor: pin deps or bump to 3.10?**
-   - **Default (recommended):** Pin `typer>=0.9,<0.21` + `rich>=13.0,<14` and keep `requires-python = ">=3.8"`. This preserves the v0.1.19 audience.
-   - Revisit trigger: if a phase discovers a feature that genuinely needs Python 3.10+ syntax or typing, raise the floor in a focused Phase 6 sub-task.
-
-2. **Polkit: merged single file or two-file split?**
-   - **Default (locked):** Single merged `40-logpose.rules` covering all known game service units via JS `indexOf` array, regenerated on every install. Old v0.1.19 `40-palserver.rules` is left on disk additively; Polkit merges across files.
-   - Fallback (documented in Phase 4 exit criteria): if the merged template proves brittle under `str.format()` JS brace escaping during Phase 4 verification, fall back to one polkit rule file per game (`40-palserver.rules` + `40-arkserver.rules`).
+- `.planning/research/satisfactory-hosting.md` — comprehensive technical brief (ports, config, API, systemd, quirks)
 
 ## Session Continuity
 
-**Last session:** 2026-04-13T17:32:42.861Z
-
-**Resume instructions:**
-
-- Run `/gsd-autonomous` to execute all remaining phases hands-off (auto-approve / yolo mode is set in `config.json`).
-- Or run `/gsd-plan-phase 1` to plan Phase 1 explicitly before executing.
-- Phase 5 planner should invoke `/gsd-research-phase` — research flag is HIGH.
-
-**Key files to re-load at session start:**
-
-- `.planning/PROJECT.md` — core value, constraints, key decisions
-- `.planning/REQUIREMENTS.md` — 56 v1 requirements + traceability
-- `.planning/ROADMAP.md` — 6 phases with goals and success criteria
-- `.planning/research/SUMMARY.md` — locked decisions, corrections, top-10 risks
-- `.planning/research/ARCHITECTURE.md` — `GameSpec` schema, factory pattern
-- `.planning/research/PITFALLS.md` — Phase 5 risk detail
-- `CLAUDE.md` — project-specific execution rules (keep `_repair_package_manager`, minimum-diff, no `BaseGame`)
+**Last session:** 2026-04-21
+**Resume instructions:** `/gsd-autonomous --from 7`
 
 ---
-*State initialized: 2026-04-12*
-*Last updated: 2026-04-12 after roadmap creation*
+*State initialized: 2026-04-21*

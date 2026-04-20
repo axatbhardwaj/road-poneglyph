@@ -7,7 +7,7 @@
 
 ## Phases
 
-- [ ] **Phase 7: Satisfactory GameSpec + Service Template** — Add `GAMES["satisfactory"]` entry, `satisfactory.service.template` (Type=simple, KillSignal=SIGINT), install helper (SteamCMD anonymous, app 1690800), sysctl tuning, polkit + golden recapture
+- [x] **Phase 7: Satisfactory GameSpec + Service Template** — Add `GAMES["satisfactory"]` entry, `satisfactory.service.template` (Type=simple, KillSignal=SIGINT), install helper (SteamCMD anonymous, app 1690800), sysctl tuning, polkit + golden recapture
 - [ ] **Phase 8: Settings Adapter + HTTPS API Client** — INI-based SettingsAdapter for Unreal Engine config files, pre-shutdown save via HTTPS API, Bearer token auth, `save` verb, health check integration
 - [ ] **Phase 9: Release Polish + v0.3.0 Publish** — README Satisfactory section, firewall ports, first-run instructions, version bump, tag v0.3.0 → PyPI
 
@@ -25,9 +25,9 @@
   5. `pytest tests/ -x` passes with 8+ tests (6 existing + 2 new Satisfactory goldens); Palworld + ARK goldens byte-identical.
 **Plans:** 3 plans
 Plans:
-- [ ] 07-01-PLAN.md — Service template + install helpers (SteamCMD wrapper, sysctl hook, custom renderer)
-- [ ] 07-02-PLAN.md — GAMES["satisfactory"] entry + factory verb routing + atomic polkit golden recapture
-- [ ] 07-03-PLAN.md — Byte-diff golden tests for Satisfactory + full harness green assertion
+- [x] 07-01-PLAN.md — Service template + install helpers (SteamCMD wrapper, sysctl hook, custom renderer)
+- [x] 07-02-PLAN.md — GAMES["satisfactory"] entry + factory verb routing + atomic polkit golden recapture
+- [x] 07-03-PLAN.md — Byte-diff golden tests for Satisfactory + full harness green assertion
 
 ### Phase 8: Settings Adapter + HTTPS API Client
 **Goal**: `road-poneglyph satisfactory edit-settings` works via INI-based adapter for Engine.ini/Game.ini/GameUserSettings.ini; pre-shutdown save calls HTTPS API `SaveGame` before SIGINT; `road-poneglyph satisfactory save` verb available.
@@ -74,7 +74,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|---------------|--------|-----------|
-| 7. Satisfactory GameSpec + Service | 0/3 | Planned | — |
+| 7. Satisfactory GameSpec + Service | 3/3 | Complete | 2026-04-20 |
 | 8. Settings Adapter + API Client | 0/0 | Not started | — |
 | 9. Release Polish + v0.3.0 Publish | 0/0 | Not started | — |
 

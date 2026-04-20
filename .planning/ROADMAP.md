@@ -40,7 +40,11 @@ Plans:
   4. `road-poneglyph satisfactory save [name]` calls the HTTPS API and reports success/failure.
   5. Bearer token cached at `~/.config/road-poneglyph/satisfactory-api-token` with mode 0600; `PasswordLogin` flow on first use.
   6. `road-poneglyph satisfactory status` includes API health check info when server is running and claimed.
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 08-01-PLAN.md — INI-based SettingsAdapter + edit-settings graceful missing-file handling
+- [ ] 08-02-PLAN.md — HTTPS API client + token caching + save verb + enhanced status
+- [ ] 08-03-PLAN.md — ExecStop pre-shutdown save wiring + golden recapture
 
 ### Phase 9: Release Polish + v0.3.0 Publish
 **Goal**: `road-poneglyph` v0.3.0 ships to PyPI with Satisfactory support, README covers all 3 games with examples, ports, and first-run guide.
@@ -52,7 +56,11 @@ Plans:
   3. Tag v0.3.0 pushed → GitHub Actions workflow builds + publishes to PyPI successfully.
   4. `pip install road-poneglyph` in a fresh venv shows `satisfactory` in `road-poneglyph --help`.
   5. `road-poneglyph satisfactory install --start` on Debian 13 completes E2E (VM-gated; may defer like Phase 5).
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 08-01-PLAN.md — INI-based SettingsAdapter + edit-settings graceful missing-file handling
+- [ ] 08-02-PLAN.md — HTTPS API client + token caching + save verb + enhanced status
+- [ ] 08-03-PLAN.md — ExecStop pre-shutdown save wiring + golden recapture
 
 ## Dependencies
 
@@ -75,7 +83,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|---------------|--------|-----------|
 | 7. Satisfactory GameSpec + Service | 3/3 | Complete | 2026-04-20 |
-| 8. Settings Adapter + API Client | 0/0 | Not started | — |
+| 8. Settings Adapter + API Client | 0/3 | In progress | — |
 | 9. Release Polish + v0.3.0 Publish | 0/0 | Not started | — |
 
 ## Coverage

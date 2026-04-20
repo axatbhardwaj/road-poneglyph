@@ -1164,8 +1164,62 @@ def _build_game_app(spec: GameSpec) -> typer.Typer:
 
         @sub.command()
         def status() -> None:
-            """Check the status of the Satisfactory dedicated server."""
+            """Check the status of the Satisfactory dedicated server (+ API health)."""
             _run_command(f"systemctl status {spec.service_name}", check=False)
+            # Attempt API health check for extra info (API-03)
+            try:
+                from road_poneglyph.satisfactory_api import health_check
+
+                result = health_check()
+                health = result.get("data", {}).get("health", "unknown")
+                console.print(f"\n[bold]API Health:[/bold] {health}")
+                custom_data = result.get("data", {}).get("serverCustomData", "")
+                if custom_data:
+                    console.print(f"[bold]Server Data:[/bold] {custom_data}")
+            except Exception:
+                console.print(
+                    "\n[dim]API health check: server not reachable or not yet claimed.[/dim]"
+                )
+
+        @sub.command()
+        def save(
+            name: str = typer.Argument("", help="Save name (empty = server default)."),
+        ) -> None:
+            """Save the game via HTTPS API (requires server claimed + running)."""
+            from road_poneglyph.satisfactory_api import (
+                load_token,
+                password_login,
+                save_game,
+            )
+
+            token = load_token()
+            if not token:
+                console.print(
+                    "[yellow]No cached API token found. Authenticating...[/yellow]"
+                )
+                console.print(
+                    "Enter the admin password set when you claimed the server in-game."
+                )
+                password = typer.prompt("Admin password", hide_input=True)
+                try:
+                    token = password_login(password)
+                    console.print(
+                        "[green]Authentication successful. Token cached.[/green]"
+                    )
+                except ConnectionError as e:
+                    console.print(f"[red]Login failed:[/red] {e}")
+                    raise typer.Exit(code=1)
+
+            try:
+                save_game(save_name=name, token=token)
+                label = f" '{name}'" if name else ""
+                console.print(f"[green]Game saved{label} successfully.[/green]")
+            except RuntimeError as e:
+                console.print(f"[red]{e}[/red]")
+                raise typer.Exit(code=1)
+            except ConnectionError as e:
+                console.print(f"[red]Save failed:[/red] {e}")
+                raise typer.Exit(code=1)
 
         @sub.command()
         def enable() -> None:

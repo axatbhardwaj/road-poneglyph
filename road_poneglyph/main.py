@@ -776,6 +776,7 @@ def _render_satisfactory_service(
         )
     else:
         auto_update_line = ""
+    token_path = Path(f"/home/{user}/.config/road-poneglyph/satisfactory-api-token")
     return template.format(
         user=user,
         port=port,
@@ -783,6 +784,7 @@ def _render_satisfactory_service(
         exec_start_path=exec_start_path,
         working_directory=working_directory,
         auto_update_line=auto_update_line,
+        token_path=token_path,
     )
 
 

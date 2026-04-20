@@ -5,7 +5,8 @@ After=syslog.target network.target nss-lookup.target network-online.target
 
 [Service]
 Environment=SteamAppId=1690800
-{auto_update_line}ExecStart={exec_start_path} -Port={port} -ReliablePort={reliable_port} -multihome=0.0.0.0 -log -unattended
+{auto_update_line}ExecStop=/bin/bash -c 'if [ -f {token_path} ]; then curl -sk --max-time 15 -H "Content-Type: application/json" -H "Authorization: Bearer $(cat {token_path})" -d "{{\\"function\\":\\"SaveGame\\",\\"data\\":{{\\"SaveName\\":\\"pre-shutdown\\"}}}}" https://localhost:{port}/api/v1 || true; sleep 2; fi'
+ExecStart={exec_start_path} -Port={port} -ReliablePort={reliable_port} -multihome=0.0.0.0 -log -unattended
 User={user}
 Group={user}
 WorkingDirectory={working_directory}

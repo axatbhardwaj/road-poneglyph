@@ -30,6 +30,7 @@ FIXTURE = {
     "exec_start_path": "/home/foo/SatisfactoryDedicatedServer/FactoryServer.sh",
     "working_directory": "/home/foo/SatisfactoryDedicatedServer",
     "auto_update_line": "",
+    "token_path": "/home/foo/.config/road-poneglyph/satisfactory-api-token",
 }
 
 

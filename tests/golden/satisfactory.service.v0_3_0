@@ -5,6 +5,7 @@ After=syslog.target network.target nss-lookup.target network-online.target
 
 [Service]
 Environment=SteamAppId=1690800
+ExecStop=/bin/bash -c 'if [ -f /home/foo/.config/road-poneglyph/satisfactory-api-token ]; then curl -sk --max-time 15 -H "Content-Type: application/json" -H "Authorization: Bearer $(cat /home/foo/.config/road-poneglyph/satisfactory-api-token)" -d "{\\"function\\":\\"SaveGame\\",\\"data\\":{\\"SaveName\\":\\"pre-shutdown\\"}}" https://localhost:7777/api/v1 || true; sleep 2; fi'
 ExecStart=/home/foo/SatisfactoryDedicatedServer/FactoryServer.sh -Port=7777 -ReliablePort=8888 -multihome=0.0.0.0 -log -unattended
 User=foo
 Group=foo

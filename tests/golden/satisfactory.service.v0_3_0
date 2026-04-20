@@ -1,0 +1,19 @@
+[Unit]
+Description=Satisfactory dedicated server
+Wants=network-online.target
+After=syslog.target network.target nss-lookup.target network-online.target
+
+[Service]
+Environment=SteamAppId=1690800
+ExecStart=/home/foo/SatisfactoryDedicatedServer/FactoryServer.sh -Port=7777 -ReliablePort=8888 -multihome=0.0.0.0 -log -unattended
+User=foo
+Group=foo
+WorkingDirectory=/home/foo/SatisfactoryDedicatedServer
+Type=simple
+Restart=on-failure
+RestartSec=60
+KillSignal=SIGINT
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

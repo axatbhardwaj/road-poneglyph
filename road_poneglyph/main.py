@@ -689,6 +689,60 @@ def _palworld_sdk_hook() -> None:
     _fix_steam_sdk(_PAL_SDK64_DST, _PAL_STEAM_CLIENT_SO)
 
 
+# --- Satisfactory install scaffolding (SAT-02..SAT-08) -----------------------
+
+
+def _satisfactory_sysctl_hook() -> None:
+    """Set vm.max_map_count=262144 — prevents crash on large Satisfactory maps (SAT-07)."""
+    console.print("Tuning vm.max_map_count for Satisfactory...")
+    _write_via_sudo_tee(
+        Path("/etc/sysctl.d/99-satisfactory.conf"),
+        "vm.max_map_count=262144\n",
+    )
+    _run_command("sudo sysctl --system")
+
+
+def _render_satisfactory_service(
+    *,
+    user: str,
+    working_directory: Path,
+    exec_start_path: Path,
+    port: int,
+    reliable_port: int,
+    auto_update: bool,
+) -> str:
+    """Render satisfactory.service.template with Satisfactory-specific placeholders."""
+    template = _get_template("satisfactory.service.template")
+    if auto_update:
+        auto_update_line = (
+            f"ExecStartPre=/usr/games/steamcmd +force_install_dir "
+            f'"{working_directory}" +login anonymous +app_update 1690800 validate +quit\n'
+        )
+    else:
+        auto_update_line = ""
+    return template.format(
+        user=user,
+        port=port,
+        reliable_port=reliable_port,
+        exec_start_path=exec_start_path,
+        working_directory=working_directory,
+        auto_update_line=auto_update_line,
+    )
+
+
+def _install_satisfactory(*, server_dir: Path, app_id: int) -> None:
+    """Install Satisfactory dedicated server via SteamCMD (anonymous, app 1690800). SAT-03."""
+    _install_steamcmd()
+    _run_command(
+        f"steamcmd +force_install_dir '{server_dir}' +login anonymous "
+        f"+app_update {app_id} validate +quit"
+    )
+    # Make the launch script executable
+    factory_script = server_dir / "FactoryServer.sh"
+    if factory_script.exists():
+        _run_command(f"chmod +x {factory_script}")
+
+
 GAMES: dict[str, GameSpec] = {
     "palworld": GameSpec(
         key="palworld",

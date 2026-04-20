@@ -354,6 +354,61 @@ def _arkmanager_save(path: Path, settings: dict[str, str]) -> None:
     _write_via_sudo_tee(path, "".join(out))
 
 
+# --- Satisfactory INI adapter (SET-05 + SET-06) ------------------------------
+# Satisfactory uses standard Unreal Engine INI — stdlib configparser is
+# appropriate (unlike Palworld's regex parser or ARK's bash-style cfg).
+
+
+def _satisfactory_ini_parse(path: Path) -> dict[str, str]:
+    """Parse Unreal Engine INI (Satisfactory). Returns flat dict with section-qualified keys.
+
+    Key format: "[SectionHeader]/KeyName" -- preserves full section path to avoid
+    collisions between sections that share key names.
+    Raises FileNotFoundError if file does not exist or is empty/has no sections.
+    """
+    import configparser
+
+    if not path.exists():
+        raise FileNotFoundError(f"Config file not found: {path}")
+    cp = configparser.RawConfigParser(
+        strict=False, interpolation=None, comment_prefixes=(";",)
+    )
+    cp.optionxform = str  # preserve case
+    cp.read(path, encoding="utf-8")
+    if not cp.sections():
+        raise FileNotFoundError(
+            f"No sections found in {path} (file may be empty or malformed)"
+        )
+    result: dict[str, str] = {}
+    for section in cp.sections():
+        for key, value in cp.items(section):
+            result[f"[{section}]/{key}"] = value
+    return result
+
+
+def _satisfactory_ini_save(path: Path, settings: dict[str, str]) -> None:
+    """Write settings back to Unreal Engine INI. Reconstructs sections from qualified keys."""
+    import configparser
+
+    cp = configparser.RawConfigParser(
+        strict=False, interpolation=None, comment_prefixes=(";",)
+    )
+    cp.optionxform = str
+    for qualified_key, value in settings.items():
+        # Parse "[Section]/Key" format
+        if "]/" in qualified_key:
+            section, key = qualified_key.split("]/", 1)
+            section = section.lstrip("[")
+        else:
+            section = "DEFAULT"
+            key = qualified_key
+        if not cp.has_section(section):
+            cp.add_section(section)
+        cp.set(section, key, value)
+    with open(path, "w", encoding="utf-8") as f:
+        cp.write(f)
+
+
 # --- ARK install scaffolding (ARK-11 + ARK-14..ARK-18) ----------------------
 # Composes docs/ark-install-reference.md §4.1-4.9 as Python helpers. Does NOT
 # render arkserver.service (opt-in; see Plan 05-02) and does NOT start the
@@ -808,7 +863,7 @@ GAMES: dict[str, GameSpec] = {
         settings_section_rename=None,
         service_name="satisfactory",
         service_template_name="satisfactory.service.template",
-        settings_adapter=SettingsAdapter(parse=_palworld_parse, save=_palworld_save),  # Placeholder — Phase 8 replaces with INI adapter
+        settings_adapter=SettingsAdapter(parse=_satisfactory_ini_parse, save=_satisfactory_ini_save),
         post_install_hooks=[_satisfactory_sysctl_hook],
         apt_packages=[],
         steam_sdk_paths=[],
@@ -1214,13 +1269,26 @@ def _build_game_app(spec: GameSpec) -> typer.Typer:
             _run_steamcmd_update(spec.server_dir, spec.app_id)
             console.print("Update complete! Restart the server for the changes to take effect.")
 
-    # --- Shared: edit-settings (SettingsAdapter-driven — both games) ---------
+    # --- Shared: edit-settings (SettingsAdapter-driven — all games) ----------
     @sub.command(name="edit-settings")
     def edit_settings() -> None:
         """Edit the game's settings file interactively."""
         try:
             settings = spec.settings_adapter.parse(spec.settings_path)
         except (FileNotFoundError, ValueError):
+            if spec.default_settings_path is None:
+                # Satisfactory quirk: config only generated after first graceful stop (SET-07)
+                console.print(
+                    f"[yellow]Configuration file not found at:[/yellow]\n"
+                    f"  {spec.settings_path}\n\n"
+                    f"[bold]Satisfactory generates config files only after the first graceful stop.[/bold]\n"
+                    f"Run these steps first:\n"
+                    f"  1. road-poneglyph {spec.key} start\n"
+                    f"  2. Wait for server to fully initialize (~1-2 minutes)\n"
+                    f"  3. road-poneglyph {spec.key} stop\n"
+                    f"  4. Then re-run: road-poneglyph {spec.key} edit-settings"
+                )
+                raise typer.Exit(code=1)
             _create_settings_from_default(
                 spec.default_settings_path,
                 spec.settings_path,

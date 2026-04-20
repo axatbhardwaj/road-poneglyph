@@ -1,16 +1,17 @@
 # road-poneglyph
 
-A multi-game dedicated server launcher for Linux. `road-poneglyph` installs, configures, and manages Palworld and ARK: Survival Evolved servers on Debian and Ubuntu using `systemd` and Polkit (Palworld) or `arkmanager` wrapped by a NOPASSWD sudoers fragment (ARK). Day-to-day start/stop/restart of Palworld needs no `sudo` at all; ARK management uses `sudo -u steam arkmanager ...` without a password prompt thanks to the installed `/etc/sudoers.d/road-poneglyph-ark` fragment.
+A multi-game dedicated server launcher for Linux. `road-poneglyph` installs, configures, and manages Palworld, ARK: Survival Evolved, and Satisfactory servers on Debian and Ubuntu using `systemd` and Polkit. Day-to-day start/stop/restart needs no `sudo` at all thanks to the merged Polkit rule and per-game sudoers fragments.
 
 ## Features
 
-- **Two games, one CLI**: `road-poneglyph palworld <verb>` installs a native systemd service for PalServer; `road-poneglyph ark <verb>` installs ark-server-tools (`arkmanager`) and wraps every verb.
-- **Automated installation**: downloads SteamCMD, pulls the right app (Palworld app id 2394010 or ARK: Survival Evolved app id 376030), and writes a systemd unit.
+- **Three games, one CLI**: `road-poneglyph palworld <verb>` installs a native systemd service for PalServer; `road-poneglyph ark <verb>` wraps ark-server-tools (`arkmanager`); `road-poneglyph satisfactory <verb>` installs Satisfactory via SteamCMD with SIGINT-based graceful shutdown and HTTPS API save integration.
+- **Automated installation**: downloads SteamCMD, pulls the right app (Palworld 2394010, ARK 376030, Satisfactory 1690800), and writes a systemd unit.
 - **Package manager repair**: attempts to fix common `apt`/`dpkg` breakage before running steamcmd.
 - **Merged Polkit rule**: a single `/etc/polkit-1/rules.d/40-road-poneglyph.rules` authorises the invoking user to start/stop/restart every known game service unit without `sudo`.
 - **ARK sudoers fragment**: `/etc/sudoers.d/road-poneglyph-ark` lets the invoking user run `sudo -u steam /usr/local/bin/arkmanager *` with no password prompt.
 - **Opt-in autostart for ARK**: `arkserver.service` is NOT installed by default. Pass `--enable-autostart` to `road-poneglyph ark install` to write and enable the systemd unit; without the flag, manage the server exclusively through `road-poneglyph ark start/stop/...` (which call `arkmanager` directly — no systemd unit needed).
-- **Interactive settings editor**: `edit-settings` parses the per-game config file (`PalWorldSettings.ini` for Palworld, `/etc/arkmanager/instances/main.cfg` for ARK) and lets you change values interactively.
+- **Interactive settings editor**: `edit-settings` parses the per-game config file (`PalWorldSettings.ini` for Palworld, `/etc/arkmanager/instances/main.cfg` for ARK, `GameUserSettings.ini` for Satisfactory) and lets you change values interactively.
+- **Satisfactory HTTPS API integration**: `road-poneglyph satisfactory save` triggers a save via the game's REST API; `stop` automatically saves before sending SIGINT.
 
 ## Prerequisites
 
@@ -69,6 +70,15 @@ road-poneglyph ark install --map TheIsland --admin-password 'your-strong-passwor
 ```
 
 If you prefer not to pick a password yourself, use `--generate-password` and `road-poneglyph` will generate a 128-bit url-safe admin password and print it once.
+
+### Satisfactory
+
+```bash
+# Install at the default ports and start immediately
+road-poneglyph satisfactory install --port 7777 --reliable-port 8888 --players 4 --start
+```
+
+**First-run note:** After installation, the first player to connect via the in-game Server Manager must "claim" the server (sets admin password). Config files (`Engine.ini`, `GameUserSettings.ini`) are only generated after the first graceful shutdown — run `road-poneglyph satisfactory stop`, then `road-poneglyph satisfactory edit-settings`.
 
 ## Palworld Usage (`road-poneglyph palworld <verb>`)
 
@@ -192,17 +202,88 @@ road-poneglyph ark edit-settings
 ```
 Opens an interactive editor against `/etc/arkmanager/instances/main.cfg` (arkmanager's instance config). It does NOT edit `GameUserSettings.ini` — arkmanager owns that file; editing it by hand is unsupported.
 
+## Satisfactory Usage (`road-poneglyph satisfactory <verb>`)
+
+Satisfactory uses a native SteamCMD install (app 1690800) with a `satisfactory.service` systemd unit. The server shuts down via **SIGINT** (not SIGTERM) and does NOT auto-save on shutdown — `road-poneglyph satisfactory stop` calls the HTTPS API `SaveGame` endpoint before sending SIGINT.
+
+**System requirements:** 12-16 GB RAM recommended (single-threaded simulation; autosaves spike memory).
+
+```bash
+# Install with default ports, 4-player cap, and start
+road-poneglyph satisfactory install --port 7777 --reliable-port 8888 --players 4 --start
+
+# With auto-update on every service start
+road-poneglyph satisfactory install --port 7777 --reliable-port 8888 --players 4 --auto-update --start
+```
+
+```bash
+road-poneglyph satisfactory start
+```
+Starts `satisfactory.service` via `systemctl start` (no sudo required).
+
+```bash
+road-poneglyph satisfactory stop
+```
+Calls the HTTPS API `SaveGame` first (pre-shutdown save), then sends SIGINT for graceful shutdown. The server does NOT auto-save on any signal.
+
+```bash
+road-poneglyph satisfactory restart
+```
+Restarts the service (triggers ExecStop save → SIGINT → ExecStart).
+
+```bash
+road-poneglyph satisfactory status
+```
+Shows systemd status + HTTPS API health check (if server is running and claimed).
+
+```bash
+road-poneglyph satisfactory save [name]
+```
+Triggers a save via the HTTPS REST API. Requires the server to be claimed (admin password set in-game). On first use, prompts for admin password and caches the Bearer token at `~/.config/road-poneglyph/satisfactory-api-token`.
+
+```bash
+road-poneglyph satisfactory enable
+```
+Enables `satisfactory.service` at boot.
+
+```bash
+road-poneglyph satisfactory disable
+```
+Disables `satisfactory.service` from starting at boot.
+
+```bash
+road-poneglyph satisfactory update
+```
+Re-runs SteamCMD to validate/update the server files.
+
+```bash
+road-poneglyph satisfactory edit-settings
+```
+Opens an interactive editor for `GameUserSettings.ini` (Unreal Engine INI format). **Note:** Config files only exist after the first graceful stop — start the server, let it initialize, then stop before editing.
+
+### Satisfactory First-Run Guide
+
+1. **Install:** `road-poneglyph satisfactory install --start`
+2. **Wait:** Server takes 2-5 minutes to fully initialize on first boot.
+3. **Claim:** Connect via the in-game Server Manager and "Claim" the server (sets admin password).
+4. **Stop once:** `road-poneglyph satisfactory stop` — this generates config files.
+5. **Edit settings:** `road-poneglyph satisfactory edit-settings` — now configs exist.
+6. **Start:** `road-poneglyph satisfactory start` — ready for players.
+
 ## Firewall / Port Reference
 
 `road-poneglyph` does NOT manage your firewall. Open the ports below yourself (example `ufw` rules included).
 
-| Game     | Protocol | Port  | Purpose                                  |
-|----------|----------|-------|------------------------------------------|
-| Palworld | UDP      | 8211  | Game + query (single port)               |
-| ARK      | UDP      | 7777  | Game port (implicit in arkmanager)       |
-| ARK      | UDP      | 7778  | `ark_Port` raw socket                    |
-| ARK      | UDP      | 27015 | `ark_QueryPort` Steam query              |
-| ARK      | TCP      | 27020 | `ark_RCONPort` RCON admin                |
+| Game         | Protocol | Port  | Purpose                                  |
+|--------------|----------|-------|------------------------------------------|
+| Palworld     | UDP      | 8211  | Game + query (single port)               |
+| ARK          | UDP      | 7777  | Game port (implicit in arkmanager)       |
+| ARK          | UDP      | 7778  | `ark_Port` raw socket                    |
+| ARK          | UDP      | 27015 | `ark_QueryPort` Steam query              |
+| ARK          | TCP      | 27020 | `ark_RCONPort` RCON admin                |
+| Satisfactory | UDP      | 7777  | Game traffic                             |
+| Satisfactory | TCP      | 7777  | HTTPS REST API (management, saves)       |
+| Satisfactory | TCP      | 8888  | Reliable messaging                       |
 
 Example ufw rules:
 
@@ -215,6 +296,11 @@ sudo ufw allow 7777/udp
 sudo ufw allow 7778/udp
 sudo ufw allow 27015/udp
 sudo ufw allow 27020/tcp
+
+# Satisfactory
+sudo ufw allow 7777/udp
+sudo ufw allow 7777/tcp
+sudo ufw allow 8888/tcp
 ```
 
 ## Permissions & Security Model

@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "road-poneglyph"
-version = "0.2.0"
+version = "0.3.0"
 authors = [
     { name = "axatbhardwaj", email = "axatbhardwaj@gmail.com" },
 ]
-description = "A Linux dedicated game server launcher for Palworld and ARK: Survival Evolved — manages steamcmd, systemd, and polkit on Debian/Ubuntu."
+description = "A Linux dedicated game server launcher for Palworld, ARK: Survival Evolved, and Satisfactory — manages steamcmd, systemd, and polkit on Debian/Ubuntu."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.8"

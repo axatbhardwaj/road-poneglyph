@@ -23,7 +23,11 @@
   3. `road-poneglyph satisfactory install --port 7777 --reliable-port 8888 --players 4 --start` completes without errors (factory dispatches all standard verbs).
   4. Merged polkit rule (`40-road-poneglyph.rules`) contains `satisfactory.service` in units list; golden recaptured atomically.
   5. `pytest tests/ -x` passes with 8+ tests (6 existing + 2 new Satisfactory goldens); Palworld + ARK goldens byte-identical.
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 07-01-PLAN.md — Service template + install helpers (SteamCMD wrapper, sysctl hook, custom renderer)
+- [ ] 07-02-PLAN.md — GAMES["satisfactory"] entry + factory verb routing + atomic polkit golden recapture
+- [ ] 07-03-PLAN.md — Byte-diff golden tests for Satisfactory + full harness green assertion
 
 ### Phase 8: Settings Adapter + HTTPS API Client
 **Goal**: `road-poneglyph satisfactory edit-settings` works via INI-based adapter for Engine.ini/Game.ini/GameUserSettings.ini; pre-shutdown save calls HTTPS API `SaveGame` before SIGINT; `road-poneglyph satisfactory save` verb available.
@@ -70,7 +74,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|---------------|--------|-----------|
-| 7. Satisfactory GameSpec + Service | 0/0 | Not started | — |
+| 7. Satisfactory GameSpec + Service | 0/3 | Planned | — |
 | 8. Settings Adapter + API Client | 0/0 | Not started | — |
 | 9. Release Polish + v0.3.0 Publish | 0/0 | Not started | — |
 

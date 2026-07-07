@@ -1,0 +1,21 @@
+[Unit]
+Description=Sons Of The Forest dedicated server (Wine)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Environment=SteamAppId=2465200
+Environment=WINEPREFIX={wine_prefix}
+Environment=WINEDEBUG=-all
+User={user}
+Group={user}
+Type=simple
+WorkingDirectory={working_directory}
+ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 1024x768x24" /usr/bin/wine {exec_start_path} -userdatapath {user_data_path}
+Restart=on-failure
+RestartSec=60
+KillSignal=SIGINT
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,5 @@
 """
-A simple tool to install and manage a Palworld dedicated server on Linux.
+A Linux CLI for installing and managing supported dedicated game servers.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from string import Formatter
 from typing import Callable, Iterable, Optional
+import json
 import re
 
 import rich
@@ -157,12 +158,36 @@ def _install_steamcmd() -> None:
         _run_command("sudo dpkg-reconfigure -fnoninteractive steamcmd", check=False)
 
 
-def _run_steamcmd_update(server_dir: Path, app_id: int) -> None:
-    """Runs steamcmd to install/update the dedicated server for the given app."""
-    _run_command(
-        f"steamcmd +force_install_dir '{server_dir}' +login anonymous "
-        f"+app_update {app_id} validate +quit"
+def _steamcmd_update_command(
+    server_dir: Path,
+    app_id: int,
+    *,
+    force_platform: Optional[str] = None,
+) -> str:
+    """Build a SteamCMD anonymous app_update command.
+
+    `force_platform` is available for Steam apps whose Linux SteamCMD metadata
+    does not resolve to the required depot by default.
+    """
+    platform_arg = (
+        f"+@sSteamCmdForcePlatformType {force_platform} "
+        if force_platform is not None
+        else ""
     )
+    return (
+        f"steamcmd {platform_arg}+force_install_dir '{server_dir}' "
+        f"+login anonymous +app_update {app_id} validate +quit"
+    )
+
+
+def _run_steamcmd_update(
+    server_dir: Path,
+    app_id: int,
+    *,
+    force_platform: Optional[str] = None,
+) -> None:
+    """Runs steamcmd to install/update the dedicated server for the given app."""
+    _run_command(_steamcmd_update_command(server_dir, app_id, force_platform=force_platform))
     server_script = server_dir / "PalServer.sh"
     if server_script.exists():
         _run_command(f"chmod +x {server_script}")
@@ -407,6 +432,40 @@ def _satisfactory_ini_save(path: Path, settings: dict[str, str]) -> None:
         cp.set(section, key, value)
     with open(path, "w", encoding="utf-8") as f:
         cp.write(f)
+
+
+# --- JSON config adapter (Sons Of The Forest) --------------------------------
+
+
+def _json_config_parse(path: Path) -> dict[str, str]:
+    """Parse a JSON config into edit-settings string values."""
+    if not path.exists():
+        raise FileNotFoundError(f"Config file not found: {path}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"Expected JSON object in {path}")
+    result: dict[str, str] = {}
+    for key, value in data.items():
+        if isinstance(value, str):
+            result[key] = value
+        else:
+            result[key] = json.dumps(value)
+    return result
+
+
+def _coerce_json_value(value: str) -> object:
+    """Coerce an edit-settings string back to a JSON scalar/object when possible."""
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return value
+
+
+def _json_config_save(path: Path, settings: dict[str, str]) -> None:
+    """Write edit-settings string values back as formatted JSON."""
+    data = {key: _coerce_json_value(value) for key, value in settings.items()}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
 # --- ARK install scaffolding (ARK-11 + ARK-14..ARK-18) ----------------------
@@ -738,6 +797,9 @@ _PAL_SERVER_DIR_LOCAL = STEAM_DIR / "steamapps/common/PalServer"
 _PAL_STEAM_CLIENT_SO = STEAM_DIR / "steamapps/common/Steamworks SDK Redist/linux64/steamclient.so"
 _PAL_SDK64_DST = Path.home() / ".steam/sdk64"
 _SAT_SERVER_DIR = Path.home() / "SatisfactoryDedicatedServer"
+_SONS_SERVER_DIR = Path.home() / "SonsOfTheForestDedicatedServer"
+_SONS_USER_DATA_DIR = _SONS_SERVER_DIR / "userdata"
+_SONS_WINE_PREFIX = Path.home() / ".local/share/road-poneglyph/wine/sons"
 
 
 def _palworld_sdk_hook() -> None:
@@ -799,6 +861,127 @@ def _install_satisfactory(*, server_dir: Path, app_id: int) -> None:
     factory_script = server_dir / "FactoryServer.sh"
     if factory_script.exists():
         _run_command(f"chmod +x {factory_script}")
+
+
+# --- Sons Of The Forest install scaffolding ----------------------------------
+
+
+def _render_sons_service(
+    *,
+    user: str,
+    working_directory: Path,
+    exec_start_path: Path,
+    user_data_path: Path,
+    wine_prefix: Path,
+) -> str:
+    """Render sons.service.template for the Windows-only dedicated server."""
+    template = _get_template("sons.service.template")
+    return template.format(
+        user=user,
+        working_directory=working_directory,
+        exec_start_path=exec_start_path,
+        user_data_path=user_data_path,
+        wine_prefix=wine_prefix,
+    )
+
+
+def _install_sons_dependencies() -> None:
+    """Install SteamCMD plus Wine/Xvfb for the Windows-only Sons server tool."""
+    _install_steamcmd()
+    _run_command("sudo dpkg --add-architecture i386")
+    _run_command("sudo apt-get update")
+    _run_command(
+        "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "
+        "--no-install-recommends wine wine64 wine32:i386 xvfb"
+    )
+
+
+def _install_sons_server_files(*, server_dir: Path, app_id: int) -> None:
+    """Download/update Sons Of The Forest Dedicated Server depots."""
+    _install_sons_dependencies()
+    _run_steamcmd_update(server_dir, app_id)
+
+
+def _sons_default_config(
+    *,
+    game_port: int,
+    query_port: int,
+    blob_sync_port: int,
+    server_name: str,
+    players: int,
+    password: str,
+    lan_only: bool,
+    game_mode: str,
+    skip_network_accessibility_test: bool,
+) -> dict[str, object]:
+    """Default dedicatedserver.cfg values from the official SOTF guide."""
+    return {
+        "IpAddress": "0.0.0.0",
+        "GamePort": game_port,
+        "QueryPort": query_port,
+        "BlobSyncPort": blob_sync_port,
+        "ServerName": server_name,
+        "MaxPlayers": players,
+        "Password": password,
+        "LanOnly": lan_only,
+        "SaveSlot": 1,
+        "SaveMode": "Continue",
+        "GameMode": game_mode,
+        "SaveInterval": 600,
+        "IdleDayCycleSpeed": 0.0,
+        "IdleTargetFramerate": 5,
+        "ActiveTargetFramerate": 60,
+        "LogFilesEnabled": True,
+        "TimestampLogFilenames": True,
+        "TimestampLogEntries": True,
+        "SkipNetworkAccessibilityTest": skip_network_accessibility_test,
+        "GameSettings": {},
+        "CustomGameModeSettings": {},
+    }
+
+
+def _seed_sons_config(
+    *,
+    user_data_path: Path,
+    game_port: int,
+    query_port: int,
+    blob_sync_port: int,
+    server_name: str,
+    players: int,
+    password: str,
+    lan_only: bool,
+    game_mode: str,
+    skip_network_accessibility_test: bool,
+    owner_steam_id: Optional[str],
+) -> None:
+    """Create or update Sons dedicatedserver.cfg and optional owner whitelist."""
+    user_data_path.mkdir(parents=True, exist_ok=True)
+    cfg_path = user_data_path / "dedicatedserver.cfg"
+    if cfg_path.exists():
+        existing = json.loads(cfg_path.read_text(encoding="utf-8"))
+        if not isinstance(existing, dict):
+            raise ValueError(f"Expected JSON object in {cfg_path}")
+    else:
+        existing = {}
+    existing.update(
+        _sons_default_config(
+            game_port=game_port,
+            query_port=query_port,
+            blob_sync_port=blob_sync_port,
+            server_name=server_name,
+            players=players,
+            password=password,
+            lan_only=lan_only,
+            game_mode=game_mode,
+            skip_network_accessibility_test=skip_network_accessibility_test,
+        )
+    )
+    cfg_path.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+
+    if owner_steam_id:
+        (user_data_path / "ownerswhitelist.txt").write_text(
+            f"{owner_steam_id}\n", encoding="utf-8"
+        )
 
 
 GAMES: dict[str, GameSpec] = {
@@ -873,6 +1056,30 @@ GAMES: dict[str, GameSpec] = {
             "port_default": 7777,
             "players_default": 4,
             "reliable_port_default": 8888,
+        },
+    ),
+    "sons": GameSpec(
+        key="sons",
+        display_name="Sons Of The Forest",
+        app_id=2465200,
+        server_dir=_SONS_SERVER_DIR,
+        binary_rel_path="SonsOfTheForestDS.exe",
+        settings_path=_SONS_USER_DATA_DIR / "dedicatedserver.cfg",
+        default_settings_path=None,
+        settings_section_rename=None,
+        service_name="sons",
+        service_template_name="sons.service.template",
+        settings_adapter=SettingsAdapter(parse=_json_config_parse, save=_json_config_save),
+        post_install_hooks=[],
+        apt_packages=["steamcmd", "wine", "wine64", "wine32:i386", "xvfb"],
+        steam_sdk_paths=[],
+        install_options={
+            "port_default": 8766,
+            "players_default": 8,
+            "query_port_default": 27016,
+            "blob_sync_port_default": 9700,
+            "server_name_default": "Sons Of The Forest Server",
+            "game_mode_default": "Normal",
         },
     ),
 }
@@ -1240,6 +1447,147 @@ def _build_game_app(spec: GameSpec) -> typer.Typer:
             _install_satisfactory(server_dir=spec.server_dir, app_id=spec.app_id)
             console.print("Update complete! Restart the server for the changes to take effect.")
 
+    elif spec.key == "sons":
+        # ---- Sons Of The Forest: Windows server tool via Wine/Xvfb -----------
+        query_port_default = int(spec.install_options["query_port_default"])
+        blob_sync_port_default = int(spec.install_options["blob_sync_port_default"])
+        server_name_default = str(spec.install_options["server_name_default"])
+        game_mode_default = str(spec.install_options["game_mode_default"])
+
+        @sub.command()
+        def install(
+            port: int = typer.Option(port_default, help="GamePort UDP."),
+            query_port: int = typer.Option(
+                query_port_default, "--query-port", help="QueryPort UDP.",
+            ),
+            blob_sync_port: int = typer.Option(
+                blob_sync_port_default,
+                "--blob-sync-port",
+                help="BlobSyncPort UDP.",
+            ),
+            players: int = typer.Option(
+                players_default, min=1, max=8, help="MaxPlayers (1-8).",
+            ),
+            server_name: str = typer.Option(
+                server_name_default, "--server-name", help="ServerName.",
+            ),
+            password: str = typer.Option(
+                "", help="Optional server password (public if empty).",
+            ),
+            game_mode: str = typer.Option(
+                game_mode_default,
+                "--game-mode",
+                help="GameMode: Normal, Hard, HardSurvival, Peaceful, Creative, or Custom.",
+            ),
+            lan_only: bool = typer.Option(
+                False, "--lan-only", help="Hide from internet listing.",
+            ),
+            skip_network_accessibility_test: bool = typer.Option(
+                False,
+                "--skip-network-accessibility-test",
+                help="Skip SOTF public port self-test.",
+            ),
+            owner_steam_id: Optional[str] = typer.Option(
+                None,
+                "--owner-steam-id",
+                help="SteamID64 to write to ownerswhitelist.txt.",
+            ),
+            start: bool = typer.Option(
+                False, "--start", help="Start the server after installation.",
+            ),
+        ) -> None:
+            """Install Sons Of The Forest Dedicated Server via Wine."""
+            if Path.home() == Path("/root"):
+                rich.print(
+                    "This script should not be run as root. Exiting.", file=sys.stderr,
+                )
+                raise typer.Exit(code=1)
+
+            _probe_port_collision([
+                ("udp", port),
+                ("udp", query_port),
+                ("udp", blob_sync_port),
+            ])
+            _install_sons_server_files(server_dir=spec.server_dir, app_id=spec.app_id)
+            _seed_sons_config(
+                user_data_path=_SONS_USER_DATA_DIR,
+                game_port=port,
+                query_port=query_port,
+                blob_sync_port=blob_sync_port,
+                server_name=server_name,
+                players=players,
+                password=password,
+                lan_only=lan_only,
+                game_mode=game_mode,
+                skip_network_accessibility_test=skip_network_accessibility_test,
+                owner_steam_id=owner_steam_id,
+            )
+            _SONS_WINE_PREFIX.mkdir(parents=True, exist_ok=True)
+            service_content = _render_sons_service(
+                user=Path.home().name,
+                working_directory=spec.server_dir,
+                exec_start_path=spec.server_dir / spec.binary_rel_path,
+                user_data_path=_SONS_USER_DATA_DIR,
+                wine_prefix=_SONS_WINE_PREFIX,
+            )
+            _write_service_file(
+                Path(f"/etc/systemd/system/{spec.service_name}.service"),
+                service_content,
+            )
+            _setup_polkit(Path.home().name, GAMES.values())
+
+            console.print("Installation complete!")
+
+            if start:
+                console.print("Starting the server...")
+                _run_command(f"systemctl start {spec.service_name}")
+                console.print("Server started successfully!")
+            else:
+                console.print(
+                    f"You can now start the server with: road-poneglyph {spec.key} start"
+                )
+
+            console.print(
+                f"To enable the server to start on boot, run: road-poneglyph {spec.key} enable"
+            )
+
+        @sub.command()
+        def start() -> None:
+            """Start the Sons Of The Forest dedicated server."""
+            _run_command(f"systemctl start {spec.service_name}")
+
+        @sub.command()
+        def stop() -> None:
+            """Stop the Sons Of The Forest dedicated server."""
+            _run_command(f"systemctl stop {spec.service_name}")
+
+        @sub.command()
+        def restart() -> None:
+            """Restart the Sons Of The Forest dedicated server."""
+            _run_command(f"systemctl restart {spec.service_name}")
+
+        @sub.command()
+        def status() -> None:
+            """Check the status of the Sons Of The Forest dedicated server."""
+            _run_command(f"systemctl status {spec.service_name}", check=False)
+
+        @sub.command()
+        def enable() -> None:
+            """Enable the Sons Of The Forest server to start on boot."""
+            _run_command(f"systemctl enable {spec.service_name}")
+
+        @sub.command()
+        def disable() -> None:
+            """Disable the Sons Of The Forest server from starting on boot."""
+            _run_command(f"systemctl disable {spec.service_name}")
+
+        @sub.command()
+        def update() -> None:
+            """Update the Sons Of The Forest dedicated server via SteamCMD."""
+            console.print(f"Updating {spec.display_name} dedicated server...")
+            _install_sons_server_files(server_dir=spec.server_dir, app_id=spec.app_id)
+            console.print("Update complete! Restart the server for the changes to take effect.")
+
     else:
         # ---- Palworld: existing Phase-4 body (unchanged — PAL-09 invariant) ----
         @sub.command()
@@ -1333,17 +1681,25 @@ def _build_game_app(spec: GameSpec) -> typer.Typer:
             settings = spec.settings_adapter.parse(spec.settings_path)
         except (FileNotFoundError, ValueError):
             if spec.default_settings_path is None:
-                # Satisfactory quirk: config only generated after first graceful stop (SET-07)
-                console.print(
-                    f"[yellow]Configuration file not found at:[/yellow]\n"
-                    f"  {spec.settings_path}\n\n"
-                    f"[bold]Satisfactory generates config files only after the first graceful stop.[/bold]\n"
-                    f"Run these steps first:\n"
-                    f"  1. road-poneglyph {spec.key} start\n"
-                    f"  2. Wait for server to fully initialize (~1-2 minutes)\n"
-                    f"  3. road-poneglyph {spec.key} stop\n"
-                    f"  4. Then re-run: road-poneglyph {spec.key} edit-settings"
-                )
+                if spec.key == "satisfactory":
+                    # Satisfactory quirk: config only generated after first graceful stop.
+                    console.print(
+                        f"[yellow]Configuration file not found at:[/yellow]\n"
+                        f"  {spec.settings_path}\n\n"
+                        f"[bold]Satisfactory generates config files only after the first graceful stop.[/bold]\n"
+                        f"Run these steps first:\n"
+                        f"  1. road-poneglyph {spec.key} start\n"
+                        f"  2. Wait for server to fully initialize (~1-2 minutes)\n"
+                        f"  3. road-poneglyph {spec.key} stop\n"
+                        f"  4. Then re-run: road-poneglyph {spec.key} edit-settings"
+                    )
+                else:
+                    console.print(
+                        f"[yellow]Configuration file not found at:[/yellow]\n"
+                        f"  {spec.settings_path}\n\n"
+                        f"Run `road-poneglyph {spec.key} install` first, then re-run "
+                        f"`road-poneglyph {spec.key} edit-settings`."
+                    )
                 raise typer.Exit(code=1)
             _create_settings_from_default(
                 spec.default_settings_path,

@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "road-poneglyph"
-version = "0.3.0"
+version = "0.4.0"
 authors = [
     { name = "axatbhardwaj", email = "axatbhardwaj@gmail.com" },
 ]
-description = "A Linux dedicated game server launcher for Palworld, ARK: Survival Evolved, and Satisfactory — manages steamcmd, systemd, and polkit on Debian/Ubuntu."
+description = "A Linux dedicated game server launcher for Palworld, ARK: Survival Evolved, Satisfactory, and Sons Of The Forest — manages steamcmd, systemd, Wine, and polkit on Debian/Ubuntu."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.8"
@@ -25,7 +25,7 @@ dependencies = [
 road-poneglyph = "road_poneglyph.main:app"
 
 [tool.setuptools]
-packages = ["road_poneglyph"]
+packages = ["road_poneglyph", "road_poneglyph.templates"]
 
 [tool.setuptools.package-data]
-"road_poneglyph" = ["templates/*"]
+"road_poneglyph.templates" = ["*"]

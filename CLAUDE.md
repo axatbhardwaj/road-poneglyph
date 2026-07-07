@@ -1,6 +1,6 @@
-# palworld-server-launcher/
+# road-poneglyph/
 
-CLI tool to install and manage a Palworld dedicated server on Linux via systemd.
+CLI tool to install and manage Palworld, ARK: Survival Evolved, Satisfactory, and Sons Of The Forest dedicated servers on Linux via systemd and Polkit.
 
 ## Files
 
@@ -13,7 +13,7 @@ CLI tool to install and manage a Palworld dedicated server on Linux via systemd.
 
 ## Subdirectories
 
-| Directory                   | What                              | When to read                                                          |
-| --------------------------- | --------------------------------- | --------------------------------------------------------------------- |
-| `palworld_server_launcher/` | Main Python package               | Implementing features, debugging CLI behavior, modifying commands     |
-| `docs/`                     | Cloud deployment guides           | Setting up server on cloud platforms, understanding deployment steps  |
+| Directory          | What                              | When to read                                                          |
+| ------------------ | --------------------------------- | --------------------------------------------------------------------- |
+| `road_poneglyph/`  | Main Python package               | Implementing features, debugging CLI behavior, modifying commands     |
+| `docs/`            | Cloud deployment guides           | Setting up server on cloud platforms, understanding deployment steps  |

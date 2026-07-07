@@ -1,0 +1,21 @@
+[Unit]
+Description=Sons Of The Forest dedicated server (Wine)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Environment=SteamAppId=2465200
+Environment=WINEPREFIX=/home/foo/.local/share/road-poneglyph/wine/sons
+Environment=WINEDEBUG=-all
+User=foo
+Group=foo
+Type=simple
+WorkingDirectory=/home/foo/SonsOfTheForestDedicatedServer
+ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 1024x768x24" /usr/bin/wine /home/foo/SonsOfTheForestDedicatedServer/SonsOfTheForestDS.exe -userdatapath /home/foo/SonsOfTheForestDedicatedServer/userdata
+Restart=on-failure
+RestartSec=60
+KillSignal=SIGINT
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

@@ -1,4 +1,4 @@
-# palworld_server_launcher/
+# road_poneglyph/
 
 Main Python package implementing the CLI application.
 

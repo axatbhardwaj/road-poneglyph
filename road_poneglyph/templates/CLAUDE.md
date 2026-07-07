@@ -10,3 +10,4 @@ Configuration templates for systemd and polkit integration.
 | `40-road-poneglyph.rules.template`  | Merged polkit rule template — authorizes every registered game's systemd unit | Modifying permission rules, debugging sudo-less service control          |
 | `arkserver.service.template`      | Opt-in systemd wrapper running `arkmanager start`/`stop` as the `steam` user (ARK-02) | Tuning ARK systemd semantics; debugging `--enable-autostart` |
 | `road-poneglyph-ark.sudoers.template`    | NOPASSWD sudoers fragment granting the installing user `sudo -u steam arkmanager *` (ARK-18) | Adjusting sudo posture, debugging `road-poneglyph ark <verb>` auth failures |
+| `sons.service.template` | systemd wrapper running Sons Of The Forest Dedicated Server through Wine/Xvfb | Tuning Sons service behavior; debugging Wine startup |

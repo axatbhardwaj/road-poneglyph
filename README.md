@@ -1,16 +1,16 @@
 # road-poneglyph
 
-A multi-game dedicated server launcher for Linux. `road-poneglyph` installs, configures, and manages Palworld, ARK: Survival Evolved, and Satisfactory servers on Debian and Ubuntu using `systemd` and Polkit. Day-to-day start/stop/restart needs no `sudo` at all thanks to the merged Polkit rule and per-game sudoers fragments.
+A multi-game dedicated server launcher for Linux. `road-poneglyph` installs, configures, and manages Palworld, ARK: Survival Evolved, Satisfactory, and Sons Of The Forest servers on Debian and Ubuntu using `systemd` and Polkit. Day-to-day start/stop/restart needs no `sudo` at all thanks to the merged Polkit rule and per-game sudoers fragments.
 
 ## Features
 
-- **Three games, one CLI**: `road-poneglyph palworld <verb>` installs a native systemd service for PalServer; `road-poneglyph ark <verb>` wraps ark-server-tools (`arkmanager`); `road-poneglyph satisfactory <verb>` installs Satisfactory via SteamCMD with SIGINT-based graceful shutdown and HTTPS API save integration.
-- **Automated installation**: downloads SteamCMD, pulls the right app (Palworld 2394010, ARK 376030, Satisfactory 1690800), and writes a systemd unit.
+- **Four games, one CLI**: `road-poneglyph palworld <verb>` installs a native systemd service for PalServer; `road-poneglyph ark <verb>` wraps ark-server-tools (`arkmanager`); `road-poneglyph satisfactory <verb>` installs Satisfactory via SteamCMD with SIGINT-based graceful shutdown and HTTPS API save integration; `road-poneglyph sons <verb>` installs Sons Of The Forest Dedicated Server through SteamCMD and runs it with Wine/Xvfb.
+- **Automated installation**: downloads SteamCMD, pulls the right app (Palworld 2394010, ARK 376030, Satisfactory 1690800, Sons Of The Forest Dedicated Server 2465200), and writes a systemd unit.
 - **Package manager repair**: attempts to fix common `apt`/`dpkg` breakage before running steamcmd.
 - **Merged Polkit rule**: a single `/etc/polkit-1/rules.d/40-road-poneglyph.rules` authorises the invoking user to start/stop/restart every known game service unit without `sudo`.
 - **ARK sudoers fragment**: `/etc/sudoers.d/road-poneglyph-ark` lets the invoking user run `sudo -u steam /usr/local/bin/arkmanager *` with no password prompt.
 - **Opt-in autostart for ARK**: `arkserver.service` is NOT installed by default. Pass `--enable-autostart` to `road-poneglyph ark install` to write and enable the systemd unit; without the flag, manage the server exclusively through `road-poneglyph ark start/stop/...` (which call `arkmanager` directly — no systemd unit needed).
-- **Interactive settings editor**: `edit-settings` parses the per-game config file (`PalWorldSettings.ini` for Palworld, `/etc/arkmanager/instances/main.cfg` for ARK, `GameUserSettings.ini` for Satisfactory) and lets you change values interactively.
+- **Interactive settings editor**: `edit-settings` parses the per-game config file (`PalWorldSettings.ini` for Palworld, `/etc/arkmanager/instances/main.cfg` for ARK, `GameUserSettings.ini` for Satisfactory, `dedicatedserver.cfg` for Sons Of The Forest) and lets you change values interactively.
 - **Satisfactory HTTPS API integration**: `road-poneglyph satisfactory save` triggers a save via the game's REST API; `stop` automatically saves before sending SIGINT.
 
 ## Prerequisites
@@ -19,6 +19,7 @@ A multi-game dedicated server launcher for Linux. `road-poneglyph` installs, con
 - `sudo` privileges for the user running `road-poneglyph`.
 - Python 3.8 or newer.
 - For ARK only: apt components `contrib non-free` (Debian) or `multiverse` (Ubuntu). `road-poneglyph ark install` enables `contrib non-free` on Debian automatically; Ubuntu server images ship `multiverse` by default.
+- For Sons Of The Forest only: the official dedicated server tool is Windows-only. `road-poneglyph sons install` installs Wine/Xvfb and downloads the Windows depot with SteamCMD; this Linux path should be treated as an unofficial compatibility setup.
 
 ## Installation
 
@@ -76,6 +77,13 @@ If you prefer not to pick a password yourself, use `--generate-password` and `ro
 ```bash
 # Install at the default ports and start immediately
 road-poneglyph satisfactory install --port 7777 --reliable-port 8888 --players 4 --start
+```
+
+### Sons Of The Forest
+
+```bash
+# Install at the default ports and start immediately
+road-poneglyph sons install --server-name 'My SOTF Server' --players 8 --start
 ```
 
 **First-run note:** After installation, the first player to connect via the in-game Server Manager must "claim" the server (sets admin password). Config files (`Engine.ini`, `GameUserSettings.ini`) are only generated after the first graceful shutdown — run `road-poneglyph satisfactory stop`, then `road-poneglyph satisfactory edit-settings`.
@@ -270,6 +278,68 @@ Opens an interactive editor for `GameUserSettings.ini` (Unreal Engine INI format
 5. **Edit settings:** `road-poneglyph satisfactory edit-settings` — now configs exist.
 6. **Start:** `road-poneglyph satisfactory start` — ready for players.
 
+## Sons Of The Forest Usage (`road-poneglyph sons <verb>`)
+
+Sons Of The Forest uses a Windows-only dedicated server tool. `road-poneglyph sons install` downloads SteamCMD app `2465200`, installs Wine/Xvfb, writes `~/SonsOfTheForestDedicatedServer/userdata/dedicatedserver.cfg`, and creates `sons.service`.
+
+```bash
+road-poneglyph sons install \
+    --server-name 'My SOTF Server' \
+    --players 8 \
+    --port 8766 \
+    --query-port 27016 \
+    --blob-sync-port 9700 \
+    --owner-steam-id 76561198000000000 \
+    --start
+```
+
+```bash
+road-poneglyph sons start
+```
+Starts `sons.service` via `systemctl start` (no sudo required after installation).
+
+```bash
+road-poneglyph sons stop
+```
+Stops `sons.service`.
+
+```bash
+road-poneglyph sons restart
+```
+Restarts `sons.service`.
+
+```bash
+road-poneglyph sons status
+```
+Shows current service status.
+
+```bash
+road-poneglyph sons enable
+```
+Enables `sons.service` at boot.
+
+```bash
+road-poneglyph sons disable
+```
+Disables `sons.service` from starting at boot.
+
+```bash
+road-poneglyph sons update
+```
+Re-runs SteamCMD to validate/update the server files.
+
+```bash
+road-poneglyph sons edit-settings
+```
+Opens an interactive editor for `dedicatedserver.cfg` (JSON format). Nested values such as `GameSettings` are edited as JSON strings.
+
+### Sons Of The Forest First-Run Notes
+
+1. **Open ports:** UDP 8766, 27016, and 9700 must be reachable unless you use `--lan-only`.
+2. **Network self-test:** the server can refuse to boot when its public port check fails. Use `--skip-network-accessibility-test` only when you understand the network tradeoff.
+3. **Owner list:** pass `--owner-steam-id <SteamID64>` during install or edit `~/SonsOfTheForestDedicatedServer/userdata/ownerswhitelist.txt` later.
+4. **Wine caveat:** Linux hosting is a compatibility path for a Windows server tool. Game or Wine updates can still break this setup.
+
 ## Firewall / Port Reference
 
 `road-poneglyph` does NOT manage your firewall. Open the ports below yourself (example `ufw` rules included).
@@ -284,6 +354,9 @@ Opens an interactive editor for `GameUserSettings.ini` (Unreal Engine INI format
 | Satisfactory | UDP      | 7777  | Game traffic                             |
 | Satisfactory | TCP      | 7777  | HTTPS REST API (management, saves)       |
 | Satisfactory | TCP      | 8888  | Reliable messaging                       |
+| Sons         | UDP      | 8766  | Game traffic                             |
+| Sons         | UDP      | 27016 | Steam query / server listing             |
+| Sons         | UDP      | 9700  | BlobSync traffic                         |
 
 Example ufw rules:
 
@@ -301,6 +374,11 @@ sudo ufw allow 27020/tcp
 sudo ufw allow 7777/udp
 sudo ufw allow 7777/tcp
 sudo ufw allow 8888/tcp
+
+# Sons Of The Forest
+sudo ufw allow 8766/udp
+sudo ufw allow 27016/udp
+sudo ufw allow 9700/udp
 ```
 
 ## Permissions & Security Model
@@ -316,6 +394,8 @@ No part of the Palworld flow edits `/etc/sudoers` or asks for a password after i
 
 **ARK.** The `arkmanager` tool runs as a dedicated `steam` system user, so every ARK verb is really `sudo -u steam /usr/local/bin/arkmanager ...`. `road-poneglyph ark install` writes `/etc/sudoers.d/road-poneglyph-ark`, which grants the installing user exactly `NOPASSWD: /usr/local/bin/arkmanager *` — no broader sudo rights, no wildcard path, no `ALL=(ALL)` clause. This is the minimum permission surface that still lets you run `road-poneglyph ark start`, `stop`, `saveworld`, `backup`, etc. without being prompted for a password.
 
+**Sons Of The Forest.** The merged Polkit rule grants the installing user control over `sons.service`. The service runs as the installing user with a dedicated Wine prefix at `~/.local/share/road-poneglyph/wine/sons`; it does not grant extra sudoers rights.
+
 ## Version
 
 ```bash
@@ -328,6 +408,7 @@ road-poneglyph --version
 - Ubuntu 22.04 LTS and Ubuntu 24.04 LTS.
 - Linux only. macOS and Windows are not supported.
 - ARK prerequisite: `contrib non-free` apt components on Debian (enabled automatically by `road-poneglyph ark install`), or `multiverse` on Ubuntu (already present on stock Ubuntu server images).
+- Sons Of The Forest caveat: the dedicated server app is Windows-only, so Linux support uses Wine/Xvfb and is best-effort.
 
 ## License
 

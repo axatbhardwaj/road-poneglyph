@@ -718,6 +718,61 @@ def _probe_port_collision(ports: list[tuple[str, int]]) -> None:
             raise typer.Exit(code=1)
 
 
+def _ats_config_parse(path: Path) -> dict[str, str]:
+    """Read scalar settings from SCS's server_config.sii."""
+    values = {}
+    for key, value in re.findall(r'^[ \t]+(\w+):\s*("(?:[^"\\]|\\.)*"|[^\n]+)', path.read_text(), re.MULTILINE):
+        value = value.strip()
+        values[key] = json.loads(value) if value.startswith('"') else value
+    return values
+
+
+def _ats_config_save(path: Path, settings: dict[str, str]) -> None:
+    """Update known scalar values, preserving other SII content."""
+    content = path.read_text()
+    for key, value in settings.items():
+        if not re.fullmatch(r"\w+", key) or "\n" in value or "\r" in value:
+            raise ValueError("Invalid ATS setting")
+        old = re.search(rf'^(\s*{re.escape(key)}:\s*)("(?:[^"\\]|\\.)*"|[^\n]+)', content, re.MULTILINE)
+        if old is None:
+            continue
+        rendered = json.dumps(value) if old.group(2).startswith('"') else value
+        content = content[:old.start(2)] + rendered + content[old.end(2):]
+    path.write_text(content)
+
+
+def _render_ats_service(user: str, server_dir: Path) -> str:
+    return _get_template("ats.service.template").format(
+        user=user, server_dir=server_dir,
+    )
+
+
+def _ats_require_packages(home: Path) -> None:
+    missing = [name for name in ("server_packages.sii", "server_packages.dat")
+               if not (home / name).is_file()]
+    if missing:
+        rich.print(f"ATS needs {', '.join(missing)} in {home}. Export them from the game first.",
+                   file=sys.stderr)
+        raise typer.Exit(code=1)
+
+
+def _setup_ats_polkit(user: str) -> None:
+    """Grant ATS control without replacing another installer's game rules."""
+    if not re.fullmatch(r"[a-z_][a-z0-9_-]*", user):
+        raise ValueError("Invalid system user")
+    rule = (
+        "polkit.addRule(function(action, subject) {\n"
+        '    if (action.id === "org.freedesktop.systemd1.manage-units" &&\n'
+        '        action.lookup("unit") === "ats.service" &&\n'
+        f'        subject.user === "{user}") {{\n'
+        "        return polkit.Result.YES;\n"
+        "    }\n"
+        "});\n"
+    )
+    _write_via_sudo_tee(Path("/etc/polkit-1/rules.d/41-road-poneglyph-ats.rules"), rule)
+    _run_command("sudo systemctl restart polkit.service")
+
+
 def _create_settings_from_default(
     default_path: Path,
     dst_path: Path,
@@ -800,6 +855,8 @@ _SAT_SERVER_DIR = Path.home() / "SatisfactoryDedicatedServer"
 _SONS_SERVER_DIR = Path.home() / "SonsOfTheForestDedicatedServer"
 _SONS_USER_DATA_DIR = _SONS_SERVER_DIR / "userdata"
 _SONS_WINE_PREFIX = Path.home() / ".local/share/road-poneglyph/wine/sons"
+_ATS_SERVER_DIR = Path.home() / "AmericanTruckSimulatorDedicatedServer"
+_ATS_CONFIG = Path.home() / ".local/share/American Truck Simulator/server_config.sii"
 
 
 def _palworld_sdk_hook() -> None:
@@ -1081,6 +1138,21 @@ GAMES: dict[str, GameSpec] = {
             "server_name_default": "Sons Of The Forest Server",
             "game_mode_default": "Normal",
         },
+    ),
+    "ats": GameSpec(
+        key="ats",
+        display_name="American Truck Simulator",
+        app_id=2239530,
+        server_dir=_ATS_SERVER_DIR,
+        binary_rel_path="bin/linux_x64/server_launch.sh",
+        settings_path=_ATS_CONFIG,
+        default_settings_path=None,
+        settings_section_rename=None,
+        service_name="ats",
+        service_template_name="ats.service.template",
+        settings_adapter=SettingsAdapter(parse=_ats_config_parse, save=_ats_config_save),
+        install_options={"port_default": 27025, "players_default": 8,
+                         "query_port_default": 27026},
     ),
 }
 
@@ -1446,6 +1518,73 @@ def _build_game_app(spec: GameSpec) -> typer.Typer:
             console.print(f"Updating {spec.display_name} dedicated server...")
             _install_satisfactory(server_dir=spec.server_dir, app_id=spec.app_id)
             console.print("Update complete! Restart the server for the changes to take effect.")
+
+    elif spec.key == "ats":
+        query_port_default = int(spec.install_options["query_port_default"])
+
+        @sub.command()
+        def install(
+            port: int = typer.Option(port_default, min=1, max=65535),
+            query_port: int = typer.Option(query_port_default, "--query-port", min=1, max=65535),
+            players: int = typer.Option(players_default, min=1, max=8),
+            server_name: str = typer.Option("Road Poneglyph ATS", "--server-name"),
+            start: bool = typer.Option(False, "--start"),
+        ) -> None:
+            """Install ATS. Exported server_packages.sii/.dat are required to start."""
+            if Path.home() == Path("/root"):
+                rich.print("Run as the game server user, not root.", file=sys.stderr)
+                raise typer.Exit(code=1)
+            if port == query_port or len(server_name) > 63 or not server_name:
+                raise typer.BadParameter("Ports must differ; server name must be 1-63 characters")
+            _probe_port_collision([("udp", port), ("udp", query_port),
+                                   ("tcp", port), ("tcp", query_port)])
+            _install_steamcmd()
+            _run_steamcmd_update(spec.server_dir, spec.app_id)
+            if not spec.settings_path.exists():
+                spec.settings_path.parent.mkdir(parents=True, exist_ok=True)
+                spec.settings_path.write_text(_get_template("ats-server_config.sii.template"))
+            config = _ats_config_parse(spec.settings_path)
+            config.update(lobby_name=server_name, max_players=str(players),
+                          connection_dedicated_port=str(port), query_dedicated_port=str(query_port))
+            _ats_config_save(spec.settings_path, config)
+            _write_service_file(Path("/etc/systemd/system/ats.service"),
+                                _render_ats_service(Path.home().name, spec.server_dir))
+            _setup_ats_polkit(Path.home().name)
+            if start:
+                _ats_require_packages(spec.settings_path.parent)
+                _run_command("systemctl start ats")
+            console.print("ATS installed. Place server_packages.sii and server_packages.dat in "
+                          f"{spec.settings_path.parent} before starting.")
+
+        @sub.command()
+        def start() -> None:
+            _ats_require_packages(spec.settings_path.parent)
+            _run_command("systemctl start ats")
+
+        @sub.command()
+        def stop() -> None:
+            _run_command("systemctl stop ats")
+
+        @sub.command()
+        def restart() -> None:
+            _ats_require_packages(spec.settings_path.parent)
+            _run_command("systemctl restart ats")
+
+        @sub.command()
+        def status() -> None:
+            _run_command("systemctl status ats", check=False)
+
+        @sub.command()
+        def enable() -> None:
+            _run_command("systemctl enable ats")
+
+        @sub.command()
+        def disable() -> None:
+            _run_command("systemctl disable ats")
+
+        @sub.command()
+        def update() -> None:
+            _run_steamcmd_update(spec.server_dir, spec.app_id)
 
     elif spec.key == "sons":
         # ---- Sons Of The Forest: Windows server tool via Wine/Xvfb -----------

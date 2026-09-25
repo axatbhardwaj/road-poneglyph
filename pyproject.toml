@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "road-poneglyph"
-version = "0.4.0"
+version = "0.5.0"
 authors = [
     { name = "axatbhardwaj", email = "axatbhardwaj@gmail.com" },
 ]
-description = "A Linux dedicated game server launcher for Palworld, ARK: Survival Evolved, Satisfactory, and Sons Of The Forest — manages steamcmd, systemd, Wine, and polkit on Debian/Ubuntu."
+description = "A Linux dedicated game server launcher for Palworld, ARK, Satisfactory, Sons Of The Forest, and American Truck Simulator."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.8"

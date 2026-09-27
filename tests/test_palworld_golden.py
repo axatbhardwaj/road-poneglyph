@@ -101,7 +101,8 @@ def test_polkit_rule_byte_identical_to_v0_4_0_golden() -> None:
     from road_poneglyph.main import GAMES
 
     template = (ROOT / "road_poneglyph" / "templates" / "40-road-poneglyph.rules.template").read_text()
-    units = ", ".join(f'"{spec.service_name}.service"' for spec in GAMES.values())
+    legacy_games = (spec for key, spec in GAMES.items() if key != "ats")
+    units = ", ".join(f'"{spec.service_name}.service"' for spec in legacy_games)
     rendered = template.format(units=units, user="foo").encode("utf-8")
     expected = (ROOT / "tests" / "golden" / "40-road-poneglyph.rules.v0_4_0").read_bytes()
     assert rendered == expected, (

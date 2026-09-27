@@ -1,10 +1,10 @@
 # road-poneglyph
 
-A multi-game dedicated server launcher for Linux. `road-poneglyph` installs, configures, and manages Palworld, ARK: Survival Evolved, Satisfactory, and Sons Of The Forest servers on Debian and Ubuntu using `systemd` and Polkit. Day-to-day start/stop/restart needs no `sudo` at all thanks to the merged Polkit rule and per-game sudoers fragments.
+A multi-game dedicated server launcher for Linux. `road-poneglyph` installs, configures, and manages Palworld, ARK: Survival Evolved, Satisfactory, Sons Of The Forest, and American Truck Simulator servers on Debian and Ubuntu using `systemd` and Polkit. Day-to-day start/stop/restart needs no `sudo` at all thanks to the merged Polkit rule and per-game sudoers fragments.
 
 ## Features
 
-- **Four games, one CLI**: `road-poneglyph palworld <verb>` installs a native systemd service for PalServer; `road-poneglyph ark <verb>` wraps ark-server-tools (`arkmanager`); `road-poneglyph satisfactory <verb>` installs Satisfactory via SteamCMD with SIGINT-based graceful shutdown and HTTPS API save integration; `road-poneglyph sons <verb>` installs Sons Of The Forest Dedicated Server through SteamCMD and runs it with Wine/Xvfb.
+- **Five games, one CLI**: Palworld, ARK, Satisfactory, Sons Of The Forest, and American Truck Simulator each have their own `road-poneglyph <game> <verb>` commands.
 - **Automated installation**: downloads SteamCMD, pulls the right app (Palworld 2394010, ARK 376030, Satisfactory 1690800, Sons Of The Forest Dedicated Server 2465200), and writes a systemd unit.
 - **Package manager repair**: attempts to fix common `apt`/`dpkg` breakage before running steamcmd.
 - **Merged Polkit rule**: a single `/etc/polkit-1/rules.d/40-road-poneglyph.rules` authorises the invoking user to start/stop/restart every known game service unit without `sudo`.
@@ -342,6 +342,16 @@ Opens an interactive editor for `dedicatedserver.cfg` (JSON format). Nested valu
 
 ## Firewall / Port Reference
 
+### American Truck Simulator
+
+```bash
+road-poneglyph ats install --server-name 'Road Poneglyph ATS'
+```
+
+ATS also needs `server_packages.sii` and `server_packages.dat` exported from a running copy of the game. Enable the in-game console in `config.cfg` with `uset g_console "1"`, load the map, open the console with `~`, and run `export_server_packages`. Copy both generated files to `~/.local/share/American Truck Simulator/` on this server. Then run `road-poneglyph ats start` and optionally `road-poneglyph ats enable`. The `ats` command also supports `stop`, `restart`, `status`, `update`, `disable`, and `edit-settings`.
+
+The defaults are 27025 and 27026 for connection and query, with an eight-player limit. Open both TCP and UDP for these ports. SCS requires the package files for the server to load the map; SteamCMD cannot generate them. An optional Steam game server login token in `server_config.sii` gives the session a persistent search ID.
+
 `road-poneglyph` does NOT manage your firewall. Open the ports below yourself (example `ufw` rules included).
 
 | Game         | Protocol | Port  | Purpose                                  |
@@ -357,6 +367,8 @@ Opens an interactive editor for `dedicatedserver.cfg` (JSON format). Nested valu
 | Sons         | UDP      | 8766  | Game traffic                             |
 | Sons         | UDP      | 27016 | Steam query / server listing             |
 | Sons         | UDP      | 9700  | BlobSync traffic                         |
+| ATS          | TCP/UDP  | 27025 | Connection                               |
+| ATS          | TCP/UDP  | 27026 | Query                                    |
 
 Example ufw rules:
 
@@ -379,6 +391,12 @@ sudo ufw allow 8888/tcp
 sudo ufw allow 8766/udp
 sudo ufw allow 27016/udp
 sudo ufw allow 9700/udp
+
+# American Truck Simulator
+sudo ufw allow 27025/tcp
+sudo ufw allow 27025/udp
+sudo ufw allow 27026/tcp
+sudo ufw allow 27026/udp
 ```
 
 ## Permissions & Security Model

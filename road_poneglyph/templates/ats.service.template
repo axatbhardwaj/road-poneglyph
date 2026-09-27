@@ -1,0 +1,18 @@
+[Unit]
+Description=American Truck Simulator dedicated server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User={user}
+Group={user}
+Type=simple
+WorkingDirectory={server_dir}/bin/linux_x64
+ExecStart={server_dir}/bin/linux_x64/server_launch.sh
+Restart=on-failure
+RestartSec=30
+KillSignal=SIGINT
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target
